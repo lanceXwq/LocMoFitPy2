@@ -4,6 +4,8 @@ import jax.numpy as jnp
 from jax import Array
 from jax.scipy.special import logsumexp
 
+from .utils import Data
+
 
 def pairwise_sqdist(X: Array, Y: Array, invSigma: Array) -> Array:
     """
@@ -50,10 +52,12 @@ def negative_log_likelihood(
 negative_log_likelihood_jit = jax.jit(negative_log_likelihood)
 
 
-def loss(static0, locs, half_tau, log_const):
+def loss(static, data: Data):
     def nll_loss(trainable):
-        m = eqx.combine(trainable, static0)
-        positions = m()  # or positions, _ = m()
-        return negative_log_likelihood_jit(locs, positions, half_tau, log_const)
+        model = eqx.combine(trainable, static)
+        positions = model()
+        return negative_log_likelihood_jit(
+            data.locs, positions, data.half_precisions, data.log_consts
+        )
 
     return nll_loss
