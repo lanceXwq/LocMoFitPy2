@@ -5,8 +5,8 @@ from jax import Array
 def rotmat(theta: Array, phi: Array) -> Array:
     """
     Args:
-        theta: scalar (0-dim) angle θ
-        phi:   scalar (0-dim) angle ϕ
+        theta: scalar (0-dim) polar angle
+        phi:   scalar (0-dim) azimuthal angle
 
     Returns:
         R: (3, 3) rotation matrix
@@ -46,7 +46,7 @@ def unit_sphere_to_cap(
     a = (1.0 + ca) / 2.0
     b = (1.0 - ca) / 2.0
 
-    z_cap = b * z + a  # muladd(b, z, a)
+    z_cap = b * z + a
 
     r1 = jnp.sqrt(x * x + y * y)
     r2 = jnp.sqrt(jnp.maximum(0.0, 1.0 - z_cap * z_cap))

@@ -42,7 +42,6 @@ class SphericalCap(eqx.Module):
     def __call__(self):
         X = unit_sphere_to_cap(self.unit_sphere_pts, self.vartheta)
         X = (X + jnp.array([0.0, 0.0, -1.0], dtype=X.dtype)) / self.c
-
         R = rotmat(self.theta, self.phi)
         t = jnp.stack([self.x, self.y, self.z])
         return (X @ R.T) + t
