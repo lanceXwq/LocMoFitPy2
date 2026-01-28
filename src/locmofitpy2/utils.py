@@ -53,6 +53,3 @@ def partition_with_freeze(model, *, freeze: Iterable[str] = ()):
 
     mask = treedef.unflatten(mask_leaves)
     return eqx.partition(model, mask)
-
-
-combine = eqx.combine
