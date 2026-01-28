@@ -13,9 +13,7 @@ class SphericalCap(eqx.Module):
     y: Array
     z: Array
     c: Array  # curvature; radius r = 1/c
-    vartheta: Array  # ϑ: cap half-angle
-    phi0: Array
-    # φ₀: present in your Julia params; not used in your forward as written
+    alpha: Array  # α: cap half-angle
     theta: Array  # θ: rotation angle
     phi: Array  # ϕ: rotation-axis azimuth (per your rot_trans convention)
 
@@ -32,16 +30,27 @@ class SphericalCap(eqx.Module):
             y=jax.random.normal(k[1], (), dtype=dtype),
             z=jax.random.normal(k[2], (), dtype=dtype),
             c=jax.random.uniform(k[3], (), dtype=dtype),
-            vartheta=jax.random.uniform(k[4], (), dtype=dtype),
-            phi0=jax.random.uniform(k[5], (), dtype=dtype),
-            theta=jax.random.uniform(k[6], (), dtype=dtype),
-            phi=jax.random.uniform(k[7], (), dtype=dtype),
+            alpha=jax.random.uniform(k[4], (), dtype=dtype),
+            theta=jax.random.uniform(k[5], (), dtype=dtype),
+            phi=jax.random.uniform(k[6], (), dtype=dtype),
             unit_sphere_pts=unit_sphere(dtype=dtype, npoints=npoints),
         )
 
     def __call__(self):
-        X = unit_sphere_to_cap(self.unit_sphere_pts, self.vartheta)
+        X = unit_sphere_to_cap(self.unit_sphere_pts, self.alpha)
         X = (X + jnp.array([0.0, 0.0, -1.0], dtype=X.dtype)) / self.c
         R = rotmat(self.theta, self.phi)
         t = jnp.stack([self.x, self.y, self.z])
         return (X @ R.T) + t
+
+    def parameter_dict(self):
+        d = {
+            "x": self.x,
+            "y": self.y,
+            "z": self.z,
+            "c": self.c,
+            "alpha": self.alpha,
+            "theta": self.theta,
+            "phi": self.phi,
+        }
+        return {k: float(jax.device_get(v)) for k, v in d.items()}

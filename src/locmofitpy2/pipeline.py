@@ -53,6 +53,7 @@ def run_locmofit(
     model_opt = eqx.combine(trainable_opt, static0)
 
     positions = model_opt()
+    parameters = model_opt.parameter_dict()
     positions.block_until_ready()
     positions_np = np.asarray(positions)
 
@@ -60,8 +61,6 @@ def run_locmofit(
         "final_loss": float(info["final_loss"]),
         "iters": float(info["iters"]),
         "grad_norm": float(info["grad_norm"]),
-        "positions": positions_np,
-        "model": model_opt,
-        "trainable": trainable_opt,
-        "static": static0,
+        "model_points": positions_np,
+        "parameters": parameters,
     }
