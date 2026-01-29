@@ -31,7 +31,7 @@ pairwise_sqdist_jit = jax.jit(pairwise_sqdist)
 
 
 def negative_log_likelihood(
-    x_data: Array, x_model: Array, half_τ: Array, log_const: Array
+    x_data: Array, x_model: Array, half_tau: Array, log_const: Array
 ) -> Array:
     """
     Args:
@@ -43,20 +43,17 @@ def negative_log_likelihood(
     Returns:
         nll: scalar (0-dim) JAX array
     """
-    sqdist = pairwise_sqdist_jit(x_data, x_model, half_τ)
+    sqdist = pairwise_sqdist_jit(x_data, x_model, half_tau)
     per_pair_lls = log_const - sqdist
     lse = logsumexp(per_pair_lls, axis=0)
     return -jnp.sum(lse)
-
-
-negative_log_likelihood_jit = jax.jit(negative_log_likelihood)
 
 
 def loss(static, data: Data):
     def nll_loss(trainable):
         model = eqx.combine(trainable, static)
         positions = model()
-        return negative_log_likelihood_jit(
+        return negative_log_likelihood(
             data.locs, positions, data.half_precisions, data.log_consts
         )
 

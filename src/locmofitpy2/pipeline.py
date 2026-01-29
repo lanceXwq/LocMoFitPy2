@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-# from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 
 from .loss import loss
+from .models.registry import get_model_cls
 from .optim import fit_lbfgs
-from .registry import get_model_cls
 from .utils import Data, partition_with_freeze
 
 
@@ -19,8 +17,14 @@ def run_locmofit(
     locs: np.ndarray | jnp.ndarray,
     stddev: np.ndarray | jnp.ndarray,
     *,
-    seed: int = 1,
-    model_init_kwargs: Optional[Dict[str, Any]] = None,
+    x: float = 0.0,
+    y: float = 0.0,
+    z: float = 0.0,
+    c: float = 0.02,  # 50 nm
+    alpha: float = np.pi / 2,
+    theta: float = 0.0,
+    phi: float = 0.0,
+    spacing: float = 3.0,  # 3 nm
     freeze: Tuple[str, ...] = (),
     max_iter: int = 200,
     tol: float = 1e-6,
@@ -36,16 +40,22 @@ def run_locmofit(
       - model points as a NumPy array
       - optimized parameters as a Dict
     """
-    if model_init_kwargs is None:
-        model_init_kwargs = {}
-
     locs_j = jnp.asarray(locs, dtype=dtype)
     stddev_j = jnp.asarray(stddev, dtype=dtype)
     data = Data.from_arrays(locs_j, stddev_j)
 
-    key = jax.random.PRNGKey(seed)
     ModelCls = get_model_cls(model_name)
-    model0 = ModelCls.init(key, **model_init_kwargs)
+    model0 = ModelCls.init(
+        x=x,
+        y=y,
+        z=z,
+        c=c,
+        alpha=alpha,
+        theta=theta,
+        phi=phi,
+        dtype=dtype,
+        spacing=spacing,
+    )
 
     trainable0, static0 = partition_with_freeze(model0, freeze=freeze)
     loss_fn = loss(static0, data)

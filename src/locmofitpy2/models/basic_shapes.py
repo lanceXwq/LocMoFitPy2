@@ -1,9 +1,10 @@
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import numpy as np
 from jax import Array
 
-from .transformations import rotmat, unit_sphere_to_cap
+from ..transformations import rotmat, unit_sphere_to_cap
 from .unit_models import unit_sphere
 
 
@@ -21,19 +22,17 @@ class SphericalCap(eqx.Module):
     unit_sphere_pts: Array
 
     @classmethod
-    def init(
-        cls, key: Array, *, dtype=jnp.float32, npoints: int = 100
-    ) -> "SphericalCap":
-        k = jax.random.split(key, 8)
+    def init(cls, *, x, y, z, c, alpha, theta, phi, dtype, spacing) -> "SphericalCap":
+        npoints = int(np.ceil(4 * np.pi / (c * c) / (spacing * spacing)))
         return cls(
-            x=jax.random.normal(k[0], (), dtype=dtype),
-            y=jax.random.normal(k[1], (), dtype=dtype),
-            z=jax.random.normal(k[2], (), dtype=dtype),
-            c=jax.random.uniform(k[3], (), dtype=dtype),
-            alpha=jax.random.uniform(k[4], (), dtype=dtype),
-            theta=jax.random.uniform(k[5], (), dtype=dtype),
-            phi=jax.random.uniform(k[6], (), dtype=dtype),
-            unit_sphere_pts=unit_sphere(dtype=dtype, npoints=npoints),
+            x=jnp.array(x, dtype=dtype),
+            y=jnp.array(y, dtype=dtype),
+            z=jnp.array(z, dtype=dtype),
+            c=jnp.array(c, dtype=dtype),
+            alpha=jnp.array(alpha, dtype=dtype),
+            theta=jnp.array(theta, dtype=dtype),
+            phi=jnp.array(phi, dtype=dtype),
+            unit_sphere_pts=unit_sphere(dtype=dtype, npoints=int(npoints)),
         )
 
     def __call__(self):
@@ -42,10 +41,19 @@ class SphericalCap(eqx.Module):
         R = rotmat(self.theta, self.phi)
         t = jnp.stack([self.x, self.y, self.z])
         return (X @ R.T) + t
-    
+
     @property
     def dtype(self):
         return self.x.dtype
+
+    @classmethod
+    def trainable_names(cls):
+        return ("x", "y", "z", "c", "alpha", "theta", "phi")
+
+    def parameter_vector(self):
+        return jnp.stack(
+            [self.x, self.y, self.z, self.c, self.alpha, self.theta, self.phi]
+        )
 
     def parameter_dict(self):
         d = {
@@ -57,4 +65,8 @@ class SphericalCap(eqx.Module):
             "theta": self.theta,
             "phi": self.phi,
         }
-        return {k: float(jax.device_get(v)) for k, v in d.items()}
+        out = {}
+        for k, v in d.items():
+            v_host = jax.device_get(v)  # bring to host (CPU)
+            out[k] = float(np.asarray(v_host))  # robust scalar conversion
+        return out

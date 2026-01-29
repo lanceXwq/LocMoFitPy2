@@ -67,7 +67,7 @@ def fit_lbfgs(
 
     params_opt, state_opt, losses, grad_norms = _solve(params0, opt_state0)
 
-    k_final = optax.tree.get(state_opt, "count")
+    k_final = int(jax.device_get(optax.tree.get(state_opt, "count")))
     losses = losses[:k_final]
     grad_norms = grad_norms[:k_final]
     return params_opt, losses, grad_norms

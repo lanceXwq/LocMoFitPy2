@@ -1,13 +1,11 @@
-from . import models as _models  # noqa: F401
-from .basic_shapes import SphericalCap
 from .loss import loss
+from .models import models as _models  # noqa: F401
+from .models.registry import get_model_cls, list_models
 from .optim import fit_lbfgs
 from .pipeline import run_locmofit
-from .registry import get_model_cls, list_models
 from .utils import partition_with_freeze
 
 __all__ = [
-    "SphericalCap",
     "partition_with_freeze",
     "loss",
     "run_locmofit",
