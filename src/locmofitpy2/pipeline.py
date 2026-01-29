@@ -29,11 +29,12 @@ def run_locmofit(
     """
     High-level fitting pipeline.
 
-    Returns a RunResult containing:
-      - fitted model object
-      - optimized trainable/static parts
-      - positions as NumPy array on host
-      - LBFGS diagnostics (final loss, iters, grad_norm)
+    Returns a Dict containing:
+      - final loss
+      - number of iterations
+      - final gradient norm
+      - model points as a NumPy array
+      - optimized parameters as a Dict
     """
     if model_init_kwargs is None:
         model_init_kwargs = {}

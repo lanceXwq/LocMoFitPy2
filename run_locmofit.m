@@ -11,12 +11,8 @@ locs = data(:, 1:3);
 loc_precisions = data(:,4:6);
 
 tic
-% Import the API
-bridge_dir = "/Users/lancexwq/Ries Lab/LocMoFitPy2";
-if count(py.sys.path, bridge_dir) == 0
-    insert(py.sys.path, int32(0), bridge_dir);
-end
-api = py.importlib.import_module("matlab_api");
+% Import locmofitpy2
+api = py.importlib.import_module("locmofitpy2");
 
 % Set initial value and parameters to freeze/fix
 kwargs = py.dict;
