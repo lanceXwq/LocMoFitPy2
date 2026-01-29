@@ -42,6 +42,10 @@ class SphericalCap(eqx.Module):
         R = rotmat(self.theta, self.phi)
         t = jnp.stack([self.x, self.y, self.z])
         return (X @ R.T) + t
+    
+    @property
+    def dtype(self):
+        return self.x.dtype
 
     def parameter_dict(self):
         d = {

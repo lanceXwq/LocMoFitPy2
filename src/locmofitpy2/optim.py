@@ -1,6 +1,7 @@
 from typing import Any, Callable, Dict, Tuple
 
 import jax
+import jax.numpy as jnp
 import optax
 
 
@@ -30,36 +31,35 @@ def fit_lbfgs(
     @jax.jit
     def _solve(params, opt_state):
         def step(carry):
-            params, state = carry
+            params, state, last_val, last_gn = carry
             value, grad = value_and_grad_fun(params, state=state)
+            gn = optax.tree.norm(grad)
             updates, state = optimizer.update(
                 grad, state, params, value=value, grad=grad, value_fn=loss_fn
             )
             params = optax.apply_updates(params, updates)
-            return params, state
-
+            return (params, state, value, gn)
         def cond(carry):
-            _, state = carry
+            _, state, _, _ = carry
             k = optax.tree.get(state, "count")
             g = optax.tree.get(state, "grad")
             return (k == 0) | ((k < max_iter) & (optax.tree.norm(g) >= tol))
 
-        return jax.lax.while_loop(cond, step, (params, opt_state))
+        init = (
+            params,
+            opt_state,
+            jnp.array(0.0, params0.dtype),
+            jnp.array(0.0, params0.dtype),
+        )
+        return jax.lax.while_loop(cond, step, init)
 
-    params_opt, state_opt = _solve(params0, opt_state0)
+    params_opt, state_opt, final_loss, final_gn = _solve(params0, opt_state0)
 
-    # Diagnostics (host-friendly scalars)
-    final_loss = loss_fn(params_opt)
     final_loss.block_until_ready()
-
     iters = int(optax.tree.get(state_opt, "count"))
-    grad = optax.tree.get(state_opt, "grad")
-    grad_norm = optax.tree.norm(grad)
-    grad_norm.block_until_ready()
-
     info = {
         "final_loss": float(final_loss),
         "iters": iters,  # keep numeric; MATLAB will cast anyway
-        "grad_norm": float(grad_norm),
+        "grad_norm": float(final_gn),
     }
     return params_opt, info
