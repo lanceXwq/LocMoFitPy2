@@ -1,8 +1,9 @@
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Tuple
 
 import jax
 import jax.numpy as jnp
 import optax
+from jax import Array
 
 
 def fit_lbfgs(
@@ -11,7 +12,7 @@ def fit_lbfgs(
     *,
     max_iter: int = 200,
     tol: float = 1e-6,
-) -> Tuple[Any, Dict[str, float]]:
+) -> Tuple[Any, Array, Array]:
     """
     Generic Optax L-BFGS solver.
 
@@ -31,35 +32,42 @@ def fit_lbfgs(
     @jax.jit
     def _solve(params, opt_state):
         def step(carry):
-            params, state, last_val, last_gn = carry
+            params, state, losses, grad_norms = carry
+
             value, grad = value_and_grad_fun(params, state=state)
             gn = optax.tree.norm(grad)
+
+            k = optax.tree.get(state, "count")  # take index BEFORE update increments it
+            losses = losses.at[k].set(value)
+            grad_norms = grad_norms.at[k].set(gn)
+
             updates, state = optimizer.update(
                 grad, state, params, value=value, grad=grad, value_fn=loss_fn
             )
             params = optax.apply_updates(params, updates)
-            return (params, state, value, gn)
+
+            return (params, state, losses, grad_norms)
+
         def cond(carry):
             _, state, _, _ = carry
             k = optax.tree.get(state, "count")
             g = optax.tree.get(state, "grad")
             return (k == 0) | ((k < max_iter) & (optax.tree.norm(g) >= tol))
 
+        losses = jnp.full((max_iter,), jnp.nan, dtype=params0.dtype)
+        grad_norms = jnp.full((max_iter,), jnp.nan, dtype=params0.dtype)
+
         init = (
             params,
             opt_state,
-            jnp.array(0.0, params0.dtype),
-            jnp.array(0.0, params0.dtype),
+            losses,
+            grad_norms,
         )
         return jax.lax.while_loop(cond, step, init)
 
-    params_opt, state_opt, final_loss, final_gn = _solve(params0, opt_state0)
+    params_opt, state_opt, losses, grad_norms = _solve(params0, opt_state0)
 
-    final_loss.block_until_ready()
-    iters = int(optax.tree.get(state_opt, "count"))
-    info = {
-        "final_loss": float(final_loss),
-        "iters": iters,  # keep numeric; MATLAB will cast anyway
-        "grad_norm": float(final_gn),
-    }
-    return params_opt, info
+    k_final = optax.tree.get(state_opt, "count")
+    losses = losses[:k_final]
+    grad_norms = grad_norms[:k_final]
+    return params_opt, losses, grad_norms

@@ -50,7 +50,9 @@ def run_locmofit(
     trainable0, static0 = partition_with_freeze(model0, freeze=freeze)
     loss_fn = loss(static0, data)
 
-    trainable_opt, info = fit_lbfgs(loss_fn, trainable0, max_iter=max_iter, tol=tol)
+    trainable_opt, losses, grad_norms = fit_lbfgs(
+        loss_fn, trainable0, max_iter=max_iter, tol=tol
+    )
     model_opt = eqx.combine(trainable_opt, static0)
 
     positions = model_opt()
@@ -59,9 +61,8 @@ def run_locmofit(
     positions_np = np.asarray(positions)
 
     return {
-        "final_loss": float(info["final_loss"]),
-        "iters": float(info["iters"]),
-        "grad_norm": float(info["grad_norm"]),
+        "losses": np.array(losses),
+        "grad_norms": np.array(grad_norms),
         "model_points": positions_np,
         "parameters": parameters,
     }

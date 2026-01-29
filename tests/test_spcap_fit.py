@@ -11,5 +11,5 @@ def test_spcap_fit():
     res = run_locmofit(
         "SphericalCap", locs, stddev, seed=3, freeze=(), max_iter=200, tol=1e-6
     )
-    actual_final_loss = res["final_loss"]
+    actual_final_loss = res["losses"][-1]
     assert abs(actual_final_loss - expected_final_loss) / expected_final_loss < 1e-6
