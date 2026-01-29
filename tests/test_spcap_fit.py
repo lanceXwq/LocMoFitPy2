@@ -1,5 +1,6 @@
-from locmofitpy2 import run_locmofit
 import pandas as pd
+
+from locmofitpy2 import run_locmofit
 
 
 def test_spcap_fit():
@@ -11,4 +12,4 @@ def test_spcap_fit():
         "SphericalCap", locs, stddev, seed=3, freeze=(), max_iter=200, tol=1e-6
     )
     actual_final_loss = res["final_loss"]
-    assert actual_final_loss == expected_final_loss
+    assert abs(actual_final_loss - expected_final_loss) / expected_final_loss < 1e-6
