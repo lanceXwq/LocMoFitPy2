@@ -34,7 +34,7 @@ res = api.run_locmofit( ...
 );
 
 % Collect the result
-final_loss = double(res{"final_loss"});
+final_loss = double(res{"losses"});
 positions  = double(res{"model_points"});
 parameters = res{"parameters"};
 toc
@@ -46,3 +46,4 @@ hold on
 scatter3(ground_truth(:,1), ground_truth(:,2), ground_truth(:,3))
 daspect([1 1 1])
 legend('model points','localizations')
+hold off
