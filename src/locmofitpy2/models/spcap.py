@@ -1,3 +1,5 @@
+from typing import Any, Mapping
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -15,23 +17,25 @@ class SphericalCap(eqx.Module):
     z: Array
     c: Array  # curvature; radius r = 1/c
     alpha: Array  # α: cap half-angle
-    theta: Array  # θ: rotation angle
-    phi: Array  # ϕ: rotation-axis azimuth (per your rot_trans convention)
+    theta: Array  # θ: polar angle
+    phi: Array  # ϕ: azimuth angle
 
     # Non-trainable buffer
     unit_sphere_pts: Array
 
     @classmethod
-    def init(cls, *, x, y, z, c, alpha, theta, phi, dtype, spacing) -> "SphericalCap":
-        npoints = int(np.ceil(4 * np.pi / (c * c) / (spacing * spacing)))
+    def init(cls, *, params: Mapping[str, Any], dtype, spacing) -> "SphericalCap":
+        npoints = int(
+            np.ceil(4 * np.pi / (params["c"] * params["c"]) / (spacing * spacing))
+        )
         return cls(
-            x=jnp.array(x, dtype=dtype),
-            y=jnp.array(y, dtype=dtype),
-            z=jnp.array(z, dtype=dtype),
-            c=jnp.array(c, dtype=dtype),
-            alpha=jnp.array(alpha, dtype=dtype),
-            theta=jnp.array(theta, dtype=dtype),
-            phi=jnp.array(phi, dtype=dtype),
+            x=jnp.array(params["x"], dtype=dtype),
+            y=jnp.array(params["y"], dtype=dtype),
+            z=jnp.array(params["z"], dtype=dtype),
+            c=jnp.array(params["c"], dtype=dtype),
+            alpha=jnp.array(params["alpha"], dtype=dtype),
+            theta=jnp.array(params["theta"], dtype=dtype),
+            phi=jnp.array(params["phi"], dtype=dtype),
             unit_sphere_pts=unit_sphere(dtype=dtype, npoints=int(npoints)),
         )
 

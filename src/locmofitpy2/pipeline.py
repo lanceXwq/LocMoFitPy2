@@ -1,15 +1,25 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Mapping, Optional
 
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 
 from .loss import loss
+from .models.default_params import default_params
+from .models.models import apply_init
 from .models.registry import get_model_cls
 from .optim import fit_lbfgs
 from .utils import Data, partition_with_freeze
+
+
+def normalize_dtype(dtype):
+    if dtype in ("float32", "fp32"):
+        return jnp.float32
+    if dtype in ("float64", "fp64"):
+        return jnp.float64
+    return dtype
 
 
 def run_locmofit(
@@ -17,18 +27,12 @@ def run_locmofit(
     locs: np.ndarray | jnp.ndarray,
     stddev: np.ndarray | jnp.ndarray,
     *,
-    x: float = 0.0,
-    y: float = 0.0,
-    z: float = 0.0,
-    c: float = 0.02,  # 50 nm
-    alpha: float = np.pi / 2,
-    theta: float = 0.0,
-    phi: float = 0.0,
-    spacing: float = 3.0,  # 3 nm
-    freeze: Tuple[str, ...] = (),
+    init_params: Optional[Mapping[str, Any]] = None,
+    freeze: tuple[str, ...] = (),
     max_iter: int = 200,
+    spacing: float = 3.0,  # 3 nm
+    dtype: str = "float32",
     tol: float = 1e-6,
-    dtype=jnp.float32,
 ) -> Dict[str, Any]:
     """
     High-level fitting pipeline.
@@ -40,19 +44,18 @@ def run_locmofit(
       - model points as a NumPy array
       - optimized parameters as a Dict
     """
+
+    dtype = normalize_dtype(dtype)
+
     locs_j = jnp.asarray(locs, dtype=dtype)
     stddev_j = jnp.asarray(stddev, dtype=dtype)
     data = Data.from_arrays(locs_j, stddev_j)
 
     ModelCls = get_model_cls(model_name)
+    dparams = default_params(ModelCls)
+    updated_params = apply_init(dparams, dict(init_params or {}))
     model0 = ModelCls.init(
-        x=x,
-        y=y,
-        z=z,
-        c=c,
-        alpha=alpha,
-        theta=theta,
-        phi=phi,
+        params=updated_params,
         dtype=dtype,
         spacing=spacing,
     )
