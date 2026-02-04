@@ -31,7 +31,6 @@ def _path_last_key_name(path) -> Optional[str]:
         return last.name
     if isinstance(last, jax.tree_util.DictKey):
         return str(last.key)
-    # For SequenceKey / FlattenedIndexKey, there is no stable "field name"
     return None
 
 

@@ -12,17 +12,15 @@ from .utils import to_py_or_np
 
 
 class SphericalCap(eqx.Module):
-    # Trainable parameters (0-dim arrays)
     x: Array
     y: Array
-    z: Array
+    z: Array  # apex poisition
     c: Array  # curvature; radius r = 1/c
     alpha: Array  # α: cap half-angle
     theta: Array  # θ: polar angle
     phi: Array  # ϕ: azimuth angle
 
-    # Non-trainable buffer
-    unit_sphere_pts: Array
+    unit_pts: Array
 
     @classmethod
     def init(cls, *, params: Mapping[str, Any], dtype, spacing) -> "SphericalCap":
@@ -37,11 +35,11 @@ class SphericalCap(eqx.Module):
             alpha=jnp.array(params["alpha"], dtype=dtype),
             theta=jnp.array(params["theta"], dtype=dtype),
             phi=jnp.array(params["phi"], dtype=dtype),
-            unit_sphere_pts=unit_sphere(dtype=dtype, npoints=int(npoints)),
+            unit_pts=unit_sphere(dtype=dtype, npoints=int(npoints)),
         )
 
     def __call__(self):
-        X = unit_sphere_to_cap(self.unit_sphere_pts, self.alpha)
+        X = unit_sphere_to_cap(self.unit_pts, self.alpha)
         X = (X + jnp.array([0.0, 0.0, -1.0], dtype=X.dtype)) / self.c
         R = rotmat(self.theta, self.phi)
         t = jnp.stack([self.x, self.y, self.z])
@@ -71,6 +69,6 @@ class SphericalCap(eqx.Module):
             "phi": self.phi,
         }
 
-        d_host = jax.device_get(d)  # one transfer
+        d_host = jax.device_get(d)
 
         return {k: to_py_or_np(v) for k, v in d_host.items()}
