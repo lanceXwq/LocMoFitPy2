@@ -42,10 +42,11 @@ def get_model_cls(model_name: str) -> type:
 
     init = getattr(cls, "init", None)
     if init is None or not callable(init):
-        raise TypeError(f"{cls.__name__} must define a callable `init(key, **kwargs)`.")
+        raise TypeError(
+            f"{cls.__name__} must define a callable `init(...)` classmethod."
+        )
 
-    # NOTE: this checks the class has __call__ defined, which implies instances are callable.
-    if not hasattr(cls, "__call__"):
+    if not callable(getattr(cls, "__call__", None)):
         raise TypeError(
             f"{cls.__name__} instances must be callable (implement __call__)."
         )

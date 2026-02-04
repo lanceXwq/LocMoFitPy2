@@ -8,6 +8,7 @@ from jax import Array
 
 from ..transformations import rotmat, unit_sphere_to_cap
 from .unit_models import unit_sphere
+from .utils import to_py_or_np
 
 
 class SphericalCap(eqx.Module):
@@ -59,7 +60,7 @@ class SphericalCap(eqx.Module):
             [self.x, self.y, self.z, self.c, self.alpha, self.theta, self.phi]
         )
 
-    def parameter_dict(self):
+    def parameter_dict(self) -> dict[str, Any]:
         d = {
             "x": self.x,
             "y": self.y,
@@ -69,8 +70,7 @@ class SphericalCap(eqx.Module):
             "theta": self.theta,
             "phi": self.phi,
         }
-        out = {}
-        for k, v in d.items():
-            v_host = jax.device_get(v)  # bring to host (CPU)
-            out[k] = float(np.asarray(v_host))  # robust scalar conversion
-        return out
+
+        d_host = jax.device_get(d)  # one transfer
+
+        return {k: to_py_or_np(v) for k, v in d_host.items()}

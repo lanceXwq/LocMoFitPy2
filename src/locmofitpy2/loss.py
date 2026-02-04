@@ -49,7 +49,7 @@ def negative_log_likelihood(
     return -jnp.sum(lse)
 
 
-def loss(static, data: Data):
+def make_loss(static, data: Data):
     def nll_loss(trainable):
         model = eqx.combine(trainable, static)
         positions = model()

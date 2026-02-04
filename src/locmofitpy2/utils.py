@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Iterable, Optional, Set
+from typing import Iterable, Optional
 
 import equinox as eqx
 import jax
@@ -36,19 +36,18 @@ def _path_last_key_name(path) -> Optional[str]:
 
 
 def partition_with_freeze(model, *, freeze: Iterable[str] = ()):
-    freeze_set: Set[str] = set(freeze)
+    freeze_set = set(freeze)
+    trainable_set = set(model.trainable_names())  # you define this per model
 
     path_leaves, treedef = jax.tree_util.tree_flatten_with_path(model)
 
     mask_leaves = []
     for path, leaf in path_leaves:
-        trainable = False
-
-        if eqx.is_inexact_array(leaf) and getattr(leaf, "ndim", None) == 0:
+        if eqx.is_inexact_array(leaf):
             name = _path_last_key_name(path)
-            # Train scalar params unless explicitly frozen by name.
-            trainable = (name is not None) and (name not in freeze_set)
-
+            trainable = (name in trainable_set) and (name not in freeze_set)
+        else:
+            trainable = False
         mask_leaves.append(trainable)
 
     mask = treedef.unflatten(mask_leaves)
