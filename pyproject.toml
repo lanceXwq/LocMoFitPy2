@@ -6,6 +6,7 @@ version = "0.1.0"
 dependencies = ["jax>=0.8,<1", "optax>=0.2.6,<0.3", "equinox>=0.13.3,<0.14",]
 
 [project.optional-dependencies]
+cuda12 = ['jax[cuda12]; platform_system=="Linux"',]
 cuda13 = ['jax[cuda13]; platform_system=="Linux"',]
 tpu = ["jax[tpu]",]
 
@@ -32,12 +33,18 @@ platforms = ["linux-64", "win-64", "osx-arm64"]
 [tool.pixi.pypi-dependencies]
 locmofitpy2 = { path = ".", editable = true }
 
+[tool.pixi.feature.cuda12]
+platforms = ["linux-64"]
+
 [tool.pixi.feature.cuda13]
 platforms = ["linux-64"]
 
 [tool.pixi.environments]
 default = { features = [], solve-group = "cpu" }
 dev = { features = ["dev"], solve-group = "cpu" }
-cuda13 = { features = ["dev", "cuda13"], solve-group = "cuda13" }
+cuda12 = { features = ["cuda12"], solve-group = "cuda12" }
+cuda12dev = { features = ["dev", "cuda12"], solve-group = "cuda12" }
+cuda13 = { features = ["cuda13"], solve-group = "cuda13" }
+cuda13dev = { features = ["dev", "cuda13"], solve-group = "cuda13" }
 
 [tool.pixi.tasks]
