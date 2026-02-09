@@ -1,23 +1,33 @@
 import jax.numpy as jnp
 
-GOLDEN_ANGLE = jnp.pi * (3.0 - jnp.sqrt(5.0))  # same common definition
+GOLDEN_ANGLE = jnp.pi * (3.0 - jnp.sqrt(5.0))
 
 
 def unit_sphere(
     dtype=jnp.float32,
     npoints: int = 100,
-    *,
-    gamma=GOLDEN_ANGLE,
-    mode: str = "fibonacci",
 ):
-    i = jnp.arange(npoints, dtype=dtype)
+    dt = dtype
+    i = jnp.arange(npoints, dtype=dt)
+    n_f = jnp.asarray(npoints, dtype=dt)
+    gamma = jnp.asarray(GOLDEN_ANGLE, dt)
 
-    # z in (-1, 1), avoiding endpoints (standard Fibonacci sphere variant)
-    z = 1.0 - 2.0 * (i + 0.5) / npoints
+    t = (i + 0.5) / n_f
+    z = 1.0 - 2.0 * t
     r_xy = jnp.sqrt(jnp.maximum(0.0, 1.0 - z * z))
-    phi = i * jnp.asarray(gamma, dtype=dtype)
+    phi = i * gamma
 
     x = r_xy * jnp.cos(phi)
     y = r_xy * jnp.sin(phi)
+    return jnp.stack((x, y, z), axis=1)
 
-    return jnp.stack([x, y, z], axis=1).astype(dtype)
+
+def unit_ring(
+    dtype=jnp.float32,
+    npoints: int = 100,
+):
+    phi = jnp.linspace(0.0, 2.0 * jnp.pi, npoints, endpoint=False, dtype=dtype)
+    x = jnp.cos(phi)
+    y = jnp.sin(phi)
+    z = jnp.zeros_like(x)
+    return jnp.stack((x, y, z), axis=1)

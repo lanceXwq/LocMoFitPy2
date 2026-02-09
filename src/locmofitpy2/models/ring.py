@@ -5,41 +5,36 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
-from ..transformations import rotmat, unit_sphere_to_cap
-from .unit_models import unit_sphere
+from ..transformations import rotmat
+from .unit_models import unit_ring
 from .utils import to_py_or_np
 
 
-class SphericalCap(eqx.Module):
+class Ring(eqx.Module):
     x: Array
     y: Array
-    z: Array  # apex poisition
-    c: Array  # curvature; radius r = 1/c
-    alpha: Array  # α: cap half-angle
+    z: Array  # center poisition
+    r: Array  # radius r = 1/c
     theta: Array  # θ: polar angle
     phi: Array  # ϕ: azimuth angle
 
     unit_pts: Array
 
     @classmethod
-    def init(cls, *, params: Mapping[str, Any], dtype, spacing) -> "SphericalCap":
-        npoints = int(
-            jnp.ceil(4 * jnp.pi / (params["c"] * params["c"]) / (spacing * spacing))
-        )
+    def init(cls, *, params: Mapping[str, Any], dtype, spacing) -> "Ring":
+        npoints = int(jnp.ceil(2 * jnp.pi * params["r"] / spacing))
         return cls(
             x=jnp.array(params["x"], dtype=dtype),
             y=jnp.array(params["y"], dtype=dtype),
             z=jnp.array(params["z"], dtype=dtype),
-            c=jnp.array(params["c"], dtype=dtype),
-            alpha=jnp.array(params["alpha"], dtype=dtype),
+            r=jnp.array(params["r"], dtype=dtype),
             theta=jnp.array(params["theta"], dtype=dtype),
             phi=jnp.array(params["phi"], dtype=dtype),
-            unit_pts=unit_sphere(dtype=dtype, npoints=int(npoints)),
+            unit_pts=unit_ring(dtype=dtype, npoints=int(npoints)),
         )
 
     def __call__(self):
-        X = unit_sphere_to_cap(self.unit_pts, self.alpha)
-        X = (X + jnp.array([0.0, 0.0, -1.0], dtype=X.dtype)) / self.c
+        X = self.unit_pts * self.r
         R = rotmat(self.theta, self.phi)
         t = jnp.stack([self.x, self.y, self.z])
         return (X @ R.T) + t
@@ -50,20 +45,17 @@ class SphericalCap(eqx.Module):
 
     @classmethod
     def trainable_names(cls):
-        return ("x", "y", "z", "c", "alpha", "theta", "phi")
+        return ("x", "y", "z", "r", "theta", "phi")
 
     def parameter_vector(self):
-        return jnp.stack(
-            [self.x, self.y, self.z, self.c, self.alpha, self.theta, self.phi]
-        )
+        return jnp.stack([self.x, self.y, self.z, self.r, self.theta, self.phi])
 
     def parameter_dict(self) -> dict[str, Any]:
         d = {
             "x": self.x,
             "y": self.y,
             "z": self.z,
-            "c": self.c,
-            "alpha": self.alpha,
+            "r": self.r,
             "theta": self.theta,
             "phi": self.phi,
         }

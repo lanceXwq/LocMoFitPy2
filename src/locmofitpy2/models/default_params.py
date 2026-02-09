@@ -1,5 +1,6 @@
-import numpy as np
+import jax.numpy as jnp
 
+from .ring import Ring
 from .spcap import SphericalCap
 
 
@@ -16,8 +17,16 @@ _INITIALPARAMS: dict[type, dict[str, float]] = {
         "y": 0.0,
         "z": 0.0,
         "c": 0.02,
-        "alpha": float(np.pi / 2),
+        "alpha": float(jnp.pi / 2),
         "theta": 0.0,
         "phi": 0.0,
-    }
+    },
+    Ring: {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "r": 10.0,
+        "theta": 0.0,
+        "phi": 0.0,
+    },
 }
