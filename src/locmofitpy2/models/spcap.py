@@ -1,9 +1,8 @@
 from typing import Any, Mapping
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
-from jax import Array
+from jax import Array, device_get
 
 from ..transformations import rotmat, unit_sphere_to_cap
 from .unit_models import unit_sphere
@@ -34,7 +33,7 @@ class SphericalCap(eqx.Module):
             alpha=jnp.array(params["alpha"], dtype=dtype),
             theta=jnp.array(params["theta"], dtype=dtype),
             phi=jnp.array(params["phi"], dtype=dtype),
-            unit_pts=unit_sphere(dtype=dtype, npoints=int(npoints)),
+            unit_pts=unit_sphere(dtype=dtype, npoints=npoints),
         )
 
     def __call__(self):
@@ -68,6 +67,6 @@ class SphericalCap(eqx.Module):
             "phi": self.phi,
         }
 
-        d_host = jax.device_get(d)
+        d_host = device_get(d)
 
         return {k: to_py_or_np(v) for k, v in d_host.items()}
