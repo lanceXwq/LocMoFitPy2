@@ -1,5 +1,4 @@
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jax import Array
 from jax.scipy.special import logsumexp
@@ -27,9 +26,6 @@ def pairwise_sqdist(X: Array, Y: Array, invSigma: Array) -> Array:
     return term1 + term2[None, :] - jnp.array(2.0, dtype=X.dtype) * term3
 
 
-pairwise_sqdist_jit = jax.jit(pairwise_sqdist)
-
-
 def negative_log_likelihood(
     x_data: Array, x_model: Array, half_tau: Array, log_const: Array
 ) -> Array:
@@ -43,10 +39,10 @@ def negative_log_likelihood(
     Returns:
         nll: scalar (0-dim) JAX array
     """
-    sqdist = pairwise_sqdist_jit(x_data, x_model, half_tau)
+    sqdist = pairwise_sqdist(x_data, x_model, half_tau)
     per_pair_lls = log_const - sqdist
     lse = logsumexp(per_pair_lls, axis=0)
-    return -jnp.sum(lse)
+    return -jnp.mean(lse)
 
 
 def make_loss(static, data: Data):
