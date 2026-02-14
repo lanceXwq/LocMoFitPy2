@@ -36,6 +36,8 @@ def run_locmofit(
     tol: float = 1e-6,
 ) -> dict[str, Any]:
     dtype = jnp.dtype(dtype)
+    if dtype == jnp.float64:
+        jax.config.update("jax_enable_x64", True)
 
     locs_j = jnp.asarray(locs, dtype=dtype)
     prec_j = jnp.asarray(loc_precisions, dtype=dtype)
