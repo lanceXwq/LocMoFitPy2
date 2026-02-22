@@ -48,7 +48,7 @@ def run_locmofit(
         raise ValueError(
             f"`stddev/precisions` must match `locs` shape; got {prec_j.shape} vs {locs_j.shape}"
         )
-    data = Data.from_arrays(locs_j, prec_j)
+    data = Data(locs=locs_j, precs=prec_j)
 
     ModelCls = get_model_cls(model_name)
     dparams = default_params(ModelCls)

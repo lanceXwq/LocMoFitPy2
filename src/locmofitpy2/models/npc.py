@@ -22,6 +22,7 @@ class NuclearPoreComplex(eqx.Module):
     r2: Array  # multiplicative factor relative to r1
     theta2: Array  # orientation relative to ring 1
     phi2: Array
+    sigma: Array
 
     unit_pts: Tuple[Array, Array]
 
@@ -43,6 +44,7 @@ class NuclearPoreComplex(eqx.Module):
             r2=jnp.array(params["r2"], dtype=dtype),
             theta2=jnp.array(params["theta2"], dtype=dtype),
             phi2=jnp.array(params["phi2"], dtype=dtype),
+            sigma=jnp.array(params["sigma"], dtype=dtype),
             unit_pts=(
                 unit_ring(dtype=dtype, npoints=npts[0]),
                 unit_ring(dtype=dtype, npoints=npts[1]),
@@ -91,6 +93,7 @@ class NuclearPoreComplex(eqx.Module):
             "r2",
             "theta2",
             "phi2",
+            "sigma",
         )
 
     def parameter_vector(self):
@@ -108,6 +111,7 @@ class NuclearPoreComplex(eqx.Module):
                 self.r2,
                 self.theta2,
                 self.phi2,
+                self.sigma,
             ]
         )
 
@@ -125,6 +129,7 @@ class NuclearPoreComplex(eqx.Module):
             "r2": self.r2,
             "theta2": self.theta2,
             "phi2": self.phi2,
+            "sigma": self.sigma,
         }
 
         d_host = device_get(d)

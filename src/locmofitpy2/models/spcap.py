@@ -17,6 +17,7 @@ class SphericalCap(eqx.Module):
     alpha: Array  # α: cap half-angle
     theta: Array  # θ: polar angle
     phi: Array  # ϕ: azimuth angle
+    sigma: Array
 
     unit_pts: Array
 
@@ -33,6 +34,7 @@ class SphericalCap(eqx.Module):
             alpha=jnp.array(params["alpha"], dtype=dtype),
             theta=jnp.array(params["theta"], dtype=dtype),
             phi=jnp.array(params["phi"], dtype=dtype),
+            sigma=jnp.array(params["sigma"], dtype=dtype),
             unit_pts=unit_sphere(dtype=dtype, npoints=npoints),
         )
 
@@ -49,11 +51,11 @@ class SphericalCap(eqx.Module):
 
     @classmethod
     def trainable_names(cls):
-        return ("x", "y", "z", "c", "alpha", "theta", "phi")
+        return ("x", "y", "z", "c", "alpha", "theta", "phi", "sigma")
 
     def parameter_vector(self):
         return jnp.stack(
-            [self.x, self.y, self.z, self.c, self.alpha, self.theta, self.phi]
+            [self.x, self.y, self.z, self.c, self.alpha, self.theta, self.phi, self.sigma]
         )
 
     def parameter_dict(self) -> dict[str, Any]:
@@ -65,6 +67,7 @@ class SphericalCap(eqx.Module):
             "alpha": self.alpha,
             "theta": self.theta,
             "phi": self.phi,
+            "sigma": self.sigma,
         }
 
         d_host = device_get(d)

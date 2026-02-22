@@ -17,6 +17,7 @@ class Ring(eqx.Module):
     r: Array  # radius r = 1/c
     theta: Array  # θ: polar angle
     phi: Array  # ϕ: azimuth angle
+    sigma: Array
 
     unit_pts: Array
 
@@ -30,6 +31,7 @@ class Ring(eqx.Module):
             r=jnp.array(params["r"], dtype=dtype),
             theta=jnp.array(params["theta"], dtype=dtype),
             phi=jnp.array(params["phi"], dtype=dtype),
+            sigma=jnp.array(params["sigma"], dtype=dtype),
             unit_pts=unit_ring(dtype=dtype, npoints=npoints),
         )
 
@@ -45,10 +47,10 @@ class Ring(eqx.Module):
 
     @classmethod
     def trainable_names(cls):
-        return ("x", "y", "z", "r", "theta", "phi")
+        return ("x", "y", "z", "r", "theta", "phi", "sigma")
 
     def parameter_vector(self):
-        return jnp.array([self.x, self.y, self.z, self.r, self.theta, self.phi])
+        return jnp.array([self.x, self.y, self.z, self.r, self.theta, self.phi, self.sigma])
 
     def parameter_dict(self) -> dict[str, Any]:
         d = {
@@ -58,6 +60,7 @@ class Ring(eqx.Module):
             "r": self.r,
             "theta": self.theta,
             "phi": self.phi,
+            "sigma": self.sigma,
         }
 
         d_host = device_get(d)

@@ -21,6 +21,7 @@ _INITIALPARAMS: dict[type, dict[str, float]] = {
         "alpha": float(jnp.pi / 2),
         "theta": 0.0,
         "phi": 0.0,
+        "sigma": 0.0,
     },
     Ring: {
         "x": 0.0,
@@ -29,6 +30,7 @@ _INITIALPARAMS: dict[type, dict[str, float]] = {
         "r": 10.0,
         "theta": 0.0,
         "phi": 0.0,
+        "sigma": 0.0,
     },
     NuclearPoreComplex: {
         "x1": 0.0,
@@ -43,5 +45,6 @@ _INITIALPARAMS: dict[type, dict[str, float]] = {
         "r2": 1.0,
         "theta2": 0.0,
         "phi2": 0.0,
+        "sigma": 0.0,
     },
 }
