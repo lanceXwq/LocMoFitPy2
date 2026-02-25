@@ -2,11 +2,10 @@ from typing import Any, Mapping
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, device_get
+from jax import Array
 
 from ..transformations import rotmat, unit_sphere_to_cap
 from .unit_models import unit_sphere
-from .utils import to_py_or_np
 
 
 class SphericalCap(eqx.Module):
@@ -55,21 +54,20 @@ class SphericalCap(eqx.Module):
 
     def parameter_vector(self):
         return jnp.stack(
-            [self.x, self.y, self.z, self.c, self.alpha, self.theta, self.phi, self.sigma]
+            [
+                self.x,
+                self.y,
+                self.z,
+                self.c,
+                self.alpha,
+                self.theta,
+                self.phi,
+                self.sigma,
+            ]
         )
 
-    def parameter_dict(self) -> dict[str, Any]:
-        d = {
-            "x": self.x,
-            "y": self.y,
-            "z": self.z,
-            "c": self.c,
-            "alpha": self.alpha,
-            "theta": self.theta,
-            "phi": self.phi,
-            "sigma": self.sigma,
-        }
-
-        d_host = device_get(d)
-
-        return {k: to_py_or_np(v) for k, v in d_host.items()}
+    @classmethod
+    def default_params(cls) -> dict[str, float]:
+        keys = cls.trainable_names()
+        vals = (0.0, 0.0, 0.0, 1.0, float(jnp.pi / 2), 0.0, 0.0, 0.0)
+        return dict(zip(keys, vals))

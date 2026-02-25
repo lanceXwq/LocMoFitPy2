@@ -3,11 +3,10 @@ from typing import Any, Mapping
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, device_get
+from jax import Array
 
 from ..transformations import rotmat
 from .unit_models import unit_ring
-from .utils import to_py_or_np
 
 
 class Ring(eqx.Module):
@@ -50,19 +49,12 @@ class Ring(eqx.Module):
         return ("x", "y", "z", "r", "theta", "phi", "sigma")
 
     def parameter_vector(self):
-        return jnp.array([self.x, self.y, self.z, self.r, self.theta, self.phi, self.sigma])
+        return jnp.array(
+            [self.x, self.y, self.z, self.r, self.theta, self.phi, self.sigma]
+        )
 
-    def parameter_dict(self) -> dict[str, Any]:
-        d = {
-            "x": self.x,
-            "y": self.y,
-            "z": self.z,
-            "r": self.r,
-            "theta": self.theta,
-            "phi": self.phi,
-            "sigma": self.sigma,
-        }
-
-        d_host = device_get(d)
-
-        return {k: to_py_or_np(v) for k, v in d_host.items()}
+    @classmethod
+    def default_params(cls) -> dict[str, float]:
+        keys = cls.trainable_names()
+        vals = (0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0)
+        return dict(zip(keys, vals))

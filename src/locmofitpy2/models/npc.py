@@ -2,11 +2,10 @@ from typing import Any, Mapping, Tuple
 
 import equinox as eqx
 import jax.numpy as jnp
-from jax import Array, device_get
+from jax import Array
 
 from ..transformations import rotmat
 from .unit_models import unit_ring
-from .utils import to_py_or_np
 
 
 class NuclearPoreComplex(eqx.Module):
@@ -115,23 +114,8 @@ class NuclearPoreComplex(eqx.Module):
             ]
         )
 
-    def parameter_dict(self) -> dict[str, Any]:
-        d = {
-            "x1": self.x1,
-            "y1": self.y1,
-            "z1": self.z1,
-            "r1": self.r1,
-            "theta1": self.theta1,
-            "phi1": self.phi1,
-            "x2": self.x2,
-            "y2": self.y2,
-            "z2": self.z2,
-            "r2": self.r2,
-            "theta2": self.theta2,
-            "phi2": self.phi2,
-            "sigma": self.sigma,
-        }
-
-        d_host = device_get(d)
-
-        return {k: to_py_or_np(v) for k, v in d_host.items()}
+    @classmethod
+    def default_params(cls) -> dict[str, float]:
+        keys = cls.trainable_names()
+        vals = (0.0, 0.0, 0.0, 50.0, 0.0, 0.0, 0.0, 0.0, 50.0, 1.0, 0.0, 0.0, 0.0)
+        return dict(zip(keys, vals))

@@ -2,6 +2,7 @@ import warnings
 from typing import Any, Mapping
 
 import numpy as np
+from jax import device_get
 
 
 def to_py_or_np(x: Any):
@@ -23,3 +24,9 @@ def apply_init(default: Mapping[str, Any], init: Mapping[str, Any]) -> dict[str,
     out = dict(default)
     out.update({k: v for k, v in init.items() if k in allowed})
     return out
+
+
+def parameter_dict(model):
+    d = dict(zip(model.trainable_names(), model.parameter_vector()))
+    d_host = device_get(d)
+    return {k: to_py_or_np(v) for k, v in d_host.items()}

@@ -10,9 +10,8 @@ import numpy as np
 from jax.typing import ArrayLike
 
 from .loss import make_loss
-from .models.default_params import default_params
 from .models.registry import get_model_cls
-from .models.utils import apply_init
+from .models.utils import apply_init, parameter_dict
 from .optim import fit_lbfgs
 from .utils import Data, partition_with_freeze
 
@@ -51,7 +50,7 @@ def run_locmofit(
     data = Data(locs=locs_j, precs=prec_j)
 
     ModelCls = get_model_cls(model_name)
-    dparams = default_params(ModelCls)
+    dparams = ModelCls.default_params()
     updated_params = apply_init(dparams, dict(init_params or {}))
     model0 = ModelCls.init(
         params=updated_params,
@@ -74,5 +73,5 @@ def run_locmofit(
         "losses": np.asarray(jax.device_get(losses)),
         "grad_norms": np.asarray(jax.device_get(grad_norms)),
         "model_points": np.asarray(jax.device_get(positions)),
-        "parameters": model_opt.parameter_dict(),
+        "parameters": parameter_dict(model_opt),
     }
