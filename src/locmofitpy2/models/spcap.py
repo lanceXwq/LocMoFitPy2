@@ -6,6 +6,7 @@ from jax import Array
 
 from ..transformations import rotmat, unit_sphere_to_cap
 from .unit_models import unit_sphere
+from .utils import sq_hinge
 
 
 class SphericalCap(eqx.Module):
@@ -43,6 +44,12 @@ class SphericalCap(eqx.Module):
         R = rotmat(self.theta, self.phi)
         t = jnp.stack([self.x, self.y, self.z])
         return (X @ R.T) + t
+
+    def penalty(self):
+        pen_c = sq_hinge(jnp.square(self.c) - 1.0)
+        pen_alpha = sq_hinge(self.alpha - jnp.pi) + sq_hinge(-self.alpha)
+        pen_theta = sq_hinge(self.theta - jnp.pi) + sq_hinge(-self.theta)
+        return pen_c + pen_alpha + pen_theta
 
     @property
     def dtype(self):

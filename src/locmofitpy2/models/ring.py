@@ -7,6 +7,7 @@ from jax import Array
 
 from ..transformations import rotmat
 from .unit_models import unit_ring
+from .utils import sq_hinge
 
 
 class Ring(eqx.Module):
@@ -39,6 +40,11 @@ class Ring(eqx.Module):
         R = rotmat(self.theta, self.phi)
         t = jnp.array([self.x, self.y, self.z])
         return (X @ R.T) + t
+
+    def penalty(self):
+        pen_c = sq_hinge(jnp.square(1 / self.r) - 1.0)
+        pen_theta = sq_hinge(self.theta - jnp.pi) + sq_hinge(-self.theta)
+        return pen_c + pen_theta
 
     @property
     def dtype(self):

@@ -1,6 +1,7 @@
 import warnings
 from typing import Any, Mapping
 
+import jax.numpy as jnp
 import numpy as np
 from jax import device_get
 
@@ -30,3 +31,8 @@ def parameter_dict(model):
     d = dict(zip(model.trainable_names(), model.parameter_vector()))
     d_host = device_get(d)
     return {k: to_py_or_np(v) for k, v in d_host.items()}
+
+
+def sq_hinge(x):
+    x = jnp.maximum(0.0, x)
+    return jnp.square(x)

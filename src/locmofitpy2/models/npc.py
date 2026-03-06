@@ -6,6 +6,7 @@ from jax import Array
 
 from ..transformations import rotmat
 from .unit_models import unit_ring
+from .utils import sq_hinge
 
 
 class NuclearPoreComplex(eqx.Module):
@@ -72,6 +73,13 @@ class NuclearPoreComplex(eqx.Module):
         # Global transform
         X = X @ R1.T + t1
         return X
+
+    def penalty(self):
+        pen_c1 = sq_hinge(jnp.square(1 / self.r1) - 1.0)
+        pen_c2 = sq_hinge(jnp.square(1 / self.r2) - 1.0)
+        pen_theta1 = sq_hinge(self.theta1 - jnp.pi) + sq_hinge(-self.theta1)
+        pen_theta2 = sq_hinge(self.theta2 - jnp.pi) + sq_hinge(-self.theta2)
+        return pen_c1 + pen_c2 + pen_theta1 + pen_theta2
 
     @property
     def dtype(self):
