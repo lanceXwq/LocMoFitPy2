@@ -19,7 +19,9 @@ def rotmat(theta: Array, phi: Array) -> Array:
     r20 = -sθ * cϕ
     r21 = -sθ * sϕ
     r22 = cθ
-    return jnp.stack([r00, r01, r02, r10, r11, r12, r20, r21, r22]).reshape(3, 3)
+    return jnp.stack([r00, r01, r02, r10, r11, r12, r20, r21, r22]).reshape(
+        3, 3
+    )
 
 
 def unit_sphere_to_cap(

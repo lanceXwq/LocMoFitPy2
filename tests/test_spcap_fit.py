@@ -20,4 +20,7 @@ def test_spcap_fit():
         dtype="float32",
     )
     actual_final_loss = res["losses"][-1]
-    assert abs(actual_final_loss - expected_final_loss) / expected_final_loss < 1e-6
+    assert (
+        abs(actual_final_loss - expected_final_loss) / expected_final_loss
+        < 1e-6
+    )

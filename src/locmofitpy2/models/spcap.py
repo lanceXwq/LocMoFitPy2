@@ -22,9 +22,13 @@ class SphericalCap(eqx.Module):
     unit_pts: Array
 
     @classmethod
-    def init(cls, *, params: Mapping[str, Any], dtype, spacing) -> "SphericalCap":
+    def init(
+        cls, *, params: Mapping[str, Any], dtype, spacing
+    ) -> "SphericalCap":
         npoints = int(
-            jnp.ceil(4 * jnp.pi / (params["c"] * params["c"]) / (spacing * spacing))
+            jnp.ceil(
+                4 * jnp.pi / (params["c"] * params["c"]) / (spacing * spacing)
+            )
         )
         return cls(
             x=jnp.array(params["x"], dtype=dtype),

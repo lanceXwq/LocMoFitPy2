@@ -13,12 +13,15 @@ def to_py_or_np(x: Any):
     return a
 
 
-def apply_init(default: Mapping[str, Any], init: Mapping[str, Any]) -> dict[str, Any]:
+def apply_init(
+    default: Mapping[str, Any], init: Mapping[str, Any]
+) -> dict[str, Any]:
     allowed = set(default)
     unknown = [k for k in init if k not in allowed]
     if unknown:
         warnings.warn(
-            f"Ignoring unknown init keys {unknown!r}. Allowed keys: {sorted(allowed)!r}",
+            f"Ignoring unknown init keys {unknown!r}. "
+            f"Allowed keys: {sorted(allowed)!r}",
             RuntimeWarning,
             stacklevel=2,
         )

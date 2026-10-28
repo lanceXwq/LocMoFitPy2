@@ -40,12 +40,13 @@ def run_locmofit(
 
     locs_j = jnp.asarray(locs, dtype=dtype)
     prec_j = jnp.asarray(loc_precisions, dtype=dtype)
-    if locs_j.ndim != 2 or locs_j.shape[1] != 3:
-        raise ValueError(f"`locs` must be (N,3), got {locs_j.shape}")
+    # if locs_j.ndim != 2 or locs_j.shape[1] != 3:
+    #     raise ValueError(f"`locs` must be (N,3), got {locs_j.shape}")
 
     if prec_j.shape != locs_j.shape:
         raise ValueError(
-            f"`stddev/precisions` must match `locs` shape; got {prec_j.shape} vs {locs_j.shape}"
+            "`stddev/precisions` must match `locs` shape; "
+            f"got {prec_j.shape} vs {locs_j.shape}"
         )
     data = Data(locs=locs_j, precs=prec_j)
 

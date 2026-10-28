@@ -8,10 +8,10 @@ def _norm(name: str) -> str:
     return name.strip().lower()
 
 
-def register_model(name: str, cls: type, *, aliases: tuple[str, ...] = ()) -> None:
-    """
-    Register a model class under a canonical name plus optional aliases.
-    """
+def register_model(
+    name: str, cls: type, *, aliases: tuple[str, ...] = ()
+) -> None:
+    """Register a model class under a canonical name plus optional aliases."""
     canon = _norm(name)
     _MODEL_REGISTRY[canon] = cls
     for a in aliases:
@@ -19,17 +19,12 @@ def register_model(name: str, cls: type, *, aliases: tuple[str, ...] = ()) -> No
 
 
 def list_models() -> tuple[str, ...]:
-    """
-    Return canonical registered model names (not aliases).
-    """
+    """Return canonical registered model names (not aliases)."""
     return tuple(sorted(_MODEL_REGISTRY.keys()))
 
 
 def get_model_cls(model_name: str) -> type:
-    """
-    Resolve a model name/alias to a registered model class.
-    Validates minimal interface: callable init(), callable instances.
-    """
+    """Resolve a model name/alias to a registered model class. Validates minimal interface: callable init(), callable instances."""
     key = _norm(model_name)
     key = _ALIASES.get(key, key)
 

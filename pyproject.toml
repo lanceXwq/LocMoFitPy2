@@ -49,3 +49,6 @@ cuda13 = { features = ["cuda13"], solve-group = "cuda13" }
 cuda13dev = { features = ["dev", "cuda13"], solve-group = "cuda13" }
 
 [tool.pixi.tasks]
+
+[tool.ruff]
+line-length = 79

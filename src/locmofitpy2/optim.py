@@ -6,6 +6,44 @@ import optax
 from jax import Array
 
 
+def tree_l2_norm(t):
+    return jnp.sqrt(
+        sum([jnp.vdot(x, x) for x in jax.tree_util.tree_leaves(t)])
+    )
+
+
+def tree_dot(a, b):
+    return sum(
+        [
+            jnp.vdot(x, y)
+            for x, y in zip(
+                jax.tree_util.tree_leaves(a), jax.tree_util.tree_leaves(b)
+            )
+        ]
+    )
+
+
+def log_state(step, value, grad, updates, opt_state):
+    ls_state = opt_state[2]
+    info = ls_state.info
+
+    gnorm = optax.global_norm(grad)
+    unorm = tree_l2_norm(updates)
+    cos = tree_dot(grad, updates) / (gnorm * unorm + 1e-30)
+
+    jax.debug.print(
+        "k={k} loss={loss:.6e} |g|={gn:.3e} |Δ|={un:.3e} "
+        "g·Δ/|g||Δ|={cos:.3f} lr={lr:.3e} ls={nls}",
+        k=step,
+        loss=value,
+        gn=gnorm,
+        un=unorm,
+        cos=cos,
+        lr=ls_state.learning_rate,
+        nls=info.num_linesearch_steps,
+    )
+
+
 def fit_lbfgs(
     loss_fn: Callable[[Any], Any],
     params0: Any,
@@ -25,7 +63,14 @@ def fit_lbfgs(
     Returns:
       params_opt, info dict with keys: final_loss, iters, grad_norm
     """
-    optimizer = optax.lbfgs()
+    optimizer = optax.lbfgs(
+        linesearch=optax.scale_by_zoom_linesearch(
+            max_linesearch_steps=100,
+            verbose=False,
+            initial_guess_strategy="one",
+        )
+    )
+
     opt_state0 = optimizer.init(params0)
     value_and_grad_fun = optax.value_and_grad_from_state(loss_fn)
 
@@ -37,13 +82,23 @@ def fit_lbfgs(
             value, grad = value_and_grad_fun(params, state=state)
             gn = optax.tree.norm(grad)
 
-            k = optax.tree.get(state, "count")  # take index BEFORE update increments it
+            # take index BEFORE update increments it
+            k = optax.tree.get(state, "count")
             losses = losses.at[k].set(value)
             grad_norms = grad_norms.at[k].set(gn)
 
             updates, state = optimizer.update(
                 grad, state, params, value=value, grad=grad, value_fn=loss_fn
             )
+
+            # log_state(
+            #     k,
+            #     value,
+            #     grad,
+            #     updates,
+            #     state,
+            # )
+
             params = optax.apply_updates(params, updates)
 
             return (params, state, losses, grad_norms)

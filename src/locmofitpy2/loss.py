@@ -50,8 +50,12 @@ def make_loss(static, data: Data):
         model = eqx.combine(trainable, static)
         positions = model()
         half_precs, log_consts = data.norm_const(model.sigma)
+        if data.locs.shape[1] < positions.shape[1]:
+            positions = positions[:, : data.locs.shape[1]]
         return (
-            negative_log_likelihood(data.locs, positions, half_precs, log_consts)
+            negative_log_likelihood(
+                data.locs, positions, half_precs, log_consts
+            )
             + model.penalty()
         )
 

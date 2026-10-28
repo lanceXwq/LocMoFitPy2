@@ -27,7 +27,9 @@ class NuclearPoreComplex(eqx.Module):
     unit_pts: Tuple[Array, Array]
 
     @classmethod
-    def init(cls, *, params: Mapping[str, Any], dtype, spacing) -> "NuclearPoreComplex":
+    def init(
+        cls, *, params: Mapping[str, Any], dtype, spacing
+    ) -> "NuclearPoreComplex":
         circ1 = 2 * jnp.pi * params["r1"]
         circ2 = circ1 * params["r2"]
         npts = (int(jnp.ceil(circ1 / spacing)), int(jnp.ceil(circ2 / spacing)))
@@ -125,5 +127,19 @@ class NuclearPoreComplex(eqx.Module):
     @classmethod
     def default_params(cls) -> dict[str, float]:
         keys = cls.trainable_names()
-        vals = (0.0, 0.0, 0.0, 50.0, 0.0, 0.0, 0.0, 0.0, 50.0, 1.0, 0.0, 0.0, 0.0)
+        vals = (
+            0.0,
+            0.0,
+            0.0,
+            50.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            50.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+        )
         return dict(zip(keys, vals))

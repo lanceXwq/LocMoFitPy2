@@ -47,6 +47,7 @@ Use `python -m pytest`, not the `pytest` entry point. Console-script shebangs in
 | `src/locmofitpy2/_profile.py`, `_jaxprofile.py` | Profiling helpers, gitignored (`_*profile.py`) |
 | `tests/` | One fit per model, asserting a hard-coded final loss. `example_*_data.csv` are copies of LocMoFit.jl's `simulated_data_*.csv`. |
 | `notebooks/` | Owner's fit notebooks. The simulated CSVs in `notebooks/data/` are tutorial data and are committed. `fit spcap ROI4.ipynb` runs on experiment data, which now lives in `../data/`; it still reads `data/260126_*ROI4.csv`, so it fails until its path is updated. |
+| `JULIA_DIFFERENCES.md` | How LocMoFitPy currently differs from LocMoFit.jl: the differences by design, the ones still to fix, and LocMoFit.jl changes not yet ported (features are developed in LocMoFit.jl first). Update it when a difference is fixed or a LocMoFit.jl change lands or is ported. Differences from MATLAB LocMoFit are in `../LocMoFit.jl/MATLAB_DIFFERENCES.md`. |
 | `run_locmofit.m` | MATLAB example (`pyenv` OutOfProcess). It hard-codes the env path from before the folder moved (`/Users/lancexwq/Ries Lab/LocMoFitPy2/...`). |
 | `benchmarks/`, `profiles/`, `prof.pstats`, `note.md` | Owner's experiments and notes (untracked). Ignore. |
 
@@ -65,8 +66,9 @@ Freezing works by leaf **name**: `partition_with_freeze` marks a leaf trainable 
 
 ## Conventions
 
+- Style (root `AGENTS.md`, Style guide): PEP 8, formatted with `pixi run -e dev ruff format src tests` at 79 characters (`[tool.ruff] line-length = 79` in `pyproject.toml`; ruff skips the gitignored `_*profile.py`) and checked with `pixi run -e dev ruff check --select E,W,I --ignore E501,W505 src tests`. Comments and docstrings have one line per paragraph, list item or signature, with no hard line breaks, so they may exceed 79 characters; commented-out code keeps its lines. The math names `X`, `R`, `invSigma`, … and `ModelCls` are not renamed, so the naming rules (`N`) are not part of the check.
 - **Data are `(N, D)` (rows are localizations)**, the transpose of LocMoFit.jl. Precisions are per-axis standard deviations of the same shape, in nm. For 2D input, the model points are truncated to their first 2 columns.
-- Parameter names are ASCII (`theta`, `phi`, `alpha`, `sigma`); LocMoFit.jl uses `θ`, `ϕ`, `α`, `σ`.
+- Parameter names are ASCII (`theta`, `phi`, `alpha`, `sigma`), as in LocMoFit.jl since 2026-10-28 (SciML style: no Unicode in public names).
 - `dtype="float64"` calls `jax.config.update("jax_enable_x64", True)`. That is **process-global and sticky**: it affects every later JAX call in the same Python process, including a long-lived MATLAB `pyenv` session.
 - Everything under `fit_lbfgs` is jitted. The loss must be pure and traceable: no Python branching on traced values, no `print` (use `jax.debug.print`).
 - The value `run_locmofit` returns must stay MATLAB-convertible: a `dict` of NumPy arrays and Python scalars (`losses`, `grad_norms`, `model_points`, `parameters`). Never return JAX arrays or Equinox modules.
