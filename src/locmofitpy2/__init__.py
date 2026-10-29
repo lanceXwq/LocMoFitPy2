@@ -1,15 +1,29 @@
-from .loss import make_loss
-from .models import models as _models  # noqa: F401
-from .models.registry import get_model_cls, list_models
-from .optim import fit_lbfgs
-from .pipeline import run_locmofit
-from .utils import partition_with_freeze
+from .bfgs import bfgs
+from .loss import log_likelihood, make_loss
+from .models import (
+    Composite,
+    DoubleRing,
+    Ring,
+    SpCapRing,
+    SphericalCap,
+    get_model,
+    list_models,
+)
+from .parameters import ParameterMap
+from .pipeline import fit_problem, run_locmofit
 
 __all__ = [
-    "partition_with_freeze",
-    "make_loss",
     "run_locmofit",
-    "get_model_cls",
+    "fit_problem",
+    "make_loss",
+    "log_likelihood",
+    "bfgs",
+    "Ring",
+    "SphericalCap",
+    "Composite",
+    "DoubleRing",
+    "SpCapRing",
+    "get_model",
     "list_models",
-    "fit_lbfgs",
+    "ParameterMap",
 ]

@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository. Workspace-wide rules (
 
 ## What this is
 
-**LocMoFitPy** is the JAX port of LocMoFit.jl (`../LocMoFit.jl`). It fits a static parametric geometric model to one site's localizations by maximum likelihood and **should give the same results as LocMoFit.jl**. It is meant to be called from MATLAB (SMAP, via `pyenv`; see `run_locmofit.m`) and from Python (SMAPpy). Python is capped at the newest version the **latest MATLAB release** supports through `pyenv` (R2026b → 3.14, so `<3.15`). Raise the cap when a new MATLAB release supports a newer Python. Once the lab moves to SMAPpy, follow SMAPpy's Python version instead. Everything else (JAX, Equinox, Optax) tracks the latest stable releases (Compatibility in `../AGENTS.md`).
+**LocMoFitPy** is the JAX port of LocMoFit.jl (`../LocMoFit.jl`). It fits a static parametric geometric model to one site's localizations by maximum likelihood and **should give the same results as LocMoFit.jl**. It is meant to be called from MATLAB (SMAP, via `pyenv`; see `run_locmofit.m`) and from Python (SMAPpy). Python is capped at the newest version the **latest MATLAB release** supports through `pyenv` (R2026b → 3.14, so `<3.15`). Raise the cap when a new MATLAB release supports a newer Python. Once the lab moves to SMAPpy, follow SMAPpy's Python version instead. Everything else (JAX) tracks the latest stable releases (Compatibility in `../AGENTS.md`).
 
 Names differ by layer, so do not "fix" any of them without asking:
 
@@ -13,68 +13,64 @@ Names differ by layer, so do not "fix" any of them without asking:
 - distribution: `LocMoFitPy2`
 - import: `locmofitpy2`
 
-Stack: `jax`, `equinox` (models as pytrees), `optax` (L-BFGS). Environments are managed by **pixi** (`pyproject.toml` → `[tool.pixi.*]`).
+Stack: `jax` only (since 2026-10-28; Equinox and optax were dropped when the models moved to a flat parameter vector and the optimizer to an own BFGS loop). Environments are managed by **pixi** (`pyproject.toml` → `[tool.pixi.*]`).
 
 ## Commands
 
 Run from the repo root; the tests read CSVs by relative path.
 
 ```sh
-pixi run -e dev python -m pytest tests -k "not cuda12"   # CPU tests (currently FAIL — see Testing)
+pixi run -e dev python -m pytest tests -k "not cuda12"   # CPU tests, about 1 minute
 pixi run -e dev ruff check src tests
 pixi run -e dev mypy src
-pixi run -e cuda12dev python -m pytest tests/test_spcap_fit_cuda12.py   # Linux + CUDA 12 only
+pixi run -e cuda12dev python -m pytest tests/test_fit_cuda12.py   # Linux + CUDA 12 only (skipped without a GPU)
+pixi run -e dev python benchmarks/speed/speed.py                 # speed of the loss, its gradient and the fits
 ```
 
 Use `python -m pytest`, not the `pytest` entry point. Console-script shebangs in `.pixi/envs` break whenever the folder is moved.
 
 ## Layout
 
+The package mirrors LocMoFit.jl's design (2026-10-28), so that a change there is ported module by module.
+
 | Path | Contents |
 | --- | --- |
-| `src/locmofitpy2/__init__.py` | Public API: `run_locmofit`, `make_loss`, `fit_lbfgs`, `get_model_cls`, `list_models`, `partition_with_freeze` |
-| `src/locmofitpy2/pipeline.py` | `run_locmofit` (the entry point MATLAB calls) |
-| `src/locmofitpy2/models/__init__.py` | Imports the models and **registers** them (canonical name + aliases) |
-| `src/locmofitpy2/models/registry.py` | `register_model`, `get_model_cls` (case-insensitive), `list_models` |
-| `src/locmofitpy2/models/ring.py`, `spcap.py`, `npc.py` | `Ring`, `SphericalCap`, `NuclearPoreComplex` (= LocMoFit.jl's `DoubleRing`) |
-| `src/locmofitpy2/models/unit_models.py` | `unit_sphere` (Fibonacci), `unit_ring` |
-| `src/locmofitpy2/models/utils.py` | `apply_init`, `parameter_dict`, `sq_hinge` |
-| `src/locmofitpy2/models/models.py` | `set_params` (currently unused) |
-| `src/locmofitpy2/transformations.py` | `rotmat(theta, phi)`, `unit_sphere_to_cap` |
-| `src/locmofitpy2/loss.py` | `pairwise_sqdist`, `negative_log_likelihood`, `make_loss` |
-| `src/locmofitpy2/optim.py` | `fit_lbfgs`: `optax.lbfgs` + zoom line search inside a jitted `lax.while_loop` |
-| `src/locmofitpy2/utils.py` | `Data(locs, precs).norm_const(blur)`, `partition_with_freeze` |
-| `src/locmofitpy2/_profile.py`, `_jaxprofile.py` | Profiling helpers, gitignored (`_*profile.py`) |
-| `tests/` | One fit per model, asserting a hard-coded final loss. `example_*_data.csv` are copies of LocMoFit.jl's `simulated_data_*.csv`. |
-| `notebooks/` | Owner's fit notebooks. The simulated CSVs in `notebooks/data/` are tutorial data and are committed. `fit spcap ROI4.ipynb` runs on experiment data, which now lives in `../data/`; it still reads `data/260126_*ROI4.csv`, so it fails until its path is updated. |
-| `JULIA_DIFFERENCES.md` | How LocMoFitPy currently differs from LocMoFit.jl: the differences by design, the ones still to fix, and LocMoFit.jl changes not yet ported (features are developed in LocMoFit.jl first). Update it when a difference is fixed or a LocMoFit.jl change lands or is ported. Differences from MATLAB LocMoFit are in `../LocMoFit.jl/MATLAB_DIFFERENCES.md`. |
-| `run_locmofit.m` | MATLAB example (`pyenv` OutOfProcess). It hard-codes the env path from before the folder moved (`/Users/lancexwq/Ries Lab/LocMoFitPy2/...`). |
-| `benchmarks/`, `profiles/`, `prof.pstats`, `note.md` | Owner's experiments and notes (untracked). Ignore. |
+| `src/locmofitpy2/__init__.py` | Public API: `run_locmofit`, `fit_problem`, `make_loss`, `log_likelihood`, `bfgs`, the models (`Ring`, `SphericalCap`, `Composite`, `DoubleRing`, `SpCapRing`), `get_model`, `list_models`, `ParameterMap` |
+| `src/locmofitpy2/pipeline.py` | `fit_problem` (everything a fit needs: the `Problem` and the starting free parameters), `run_locmofit` (the entry point MATLAB calls; jits `bfgs` on the loss) and the result dict |
+| `src/locmofitpy2/parameters.py` | `ParameterMap` (θ = base + S·u: free parameters → all parameters, with freezing and ties, as LocMoFit.jl's), `apply_init`, `freeze_names`, `tie_pairs` |
+| `src/locmofitpy2/models.py` | `SimpleModel` (a shape in its own frame, placed by `x, y, z, vx, vy`), `Ring`, `SphericalCap` (the constant-area cap: `s`, `eta`), `Composite` (components in component 1's frame, suffixed names, weights `omega2…`), the presets `DoubleRing`, `SpCapRing`, and the name lookup `get_model` (case-insensitive; aliases `spcap`, `npc`) |
+| `src/locmofitpy2/unit_models.py` | `unit_ring`, `unit_sphere` (Fibonacci), `unit_cap` (direction and depth), as NumPy arrays |
+| `src/locmofitpy2/transformations.py` | `rotmat(theta, phi)` (the frame of a starting axis), `chart_rotation(R0, vx, vy)`, `place` |
+| `src/locmofitpy2/loss.py` | `log_likelihood` (the mixture's log density summed over localizations, as N×M arrays with the differences formed first) and `make_loss(problem)` (minus the log posterior per localization, plus the penalty) |
+| `src/locmofitpy2/bfgs.py` | `bfgs`: BFGS with LineSearches.jl's backtracking, as Optim.jl's that LocMoFit.jl uses, in a jitted `lax.while_loop`; optional per-iteration history |
+| `src/locmofitpy2/_profile.py`, `_jaxprofile.py` | Profiling helpers, gitignored (`_*profile.py`); they predate the port |
+| `tests/` | `common.py` (fixed inputs, independent references, tutorial loaders), `test_models.py`, `test_loss.py`, `test_fit.py`, `test_fit_cuda12.py`; `data/julia_fits.jl` writes `data/julia_fits.json`, LocMoFit.jl's fits of the tutorial data, the reference of the parity tests |
+| `notebooks/` | Owner's fit notebooks, which still use the API from before the port (`c`, `alpha`, `losses`). `notebooks/data/` holds the tutorial data: `ring`, `ring2D`, `double_ring`, `spcap`, `spcap_ring` (`<case>.csv`, `_truth.csv`, `_parameters.csv`) are copies of LocMoFit.jl's `examples/data`, generated there with SimSMLM; the older `simulated_data_*.csv`, `ground_truth*.csv` are the notebooks'. `fit spcap ROI4.ipynb` runs on experiment data in `../data/`. |
+| `benchmarks/speed/` | `speed.py` (as LocMoFit.jl's `benchmarks/speed/speed.jl`) and dated results: `plain_jax_2026-10-28.txt` (the port, before any optimization) and `optimistix_2026-10-28.txt` (optimistix's BFGS against the own loop) |
+| `NOTES.md` | Implementation notes with measurements: the port (why Equinox and optax went, the optimizer as LocMoFit.jl's), optimistix tried and not adopted, the tolerance. Add to it when a performance or numerical choice is made. Not `note.md`, the owner's notes. |
+| `JULIA_DIFFERENCES.md` | How LocMoFitPy differs from LocMoFit.jl: by design, and anything still to port. Update it when LocMoFit.jl changes or a difference is resolved. Differences from MATLAB LocMoFit are in `../LocMoFit.jl/MATLAB_DIFFERENCES.md`. |
+| `run_locmofit.m` | MATLAB example (`pyenv` OutOfProcess). It still uses the API from before the port and hard-codes the env path from before the folder moved (`/Users/lancexwq/Ries Lab/LocMoFitPy2/...`). |
+| `benchmarks/logprod_vs_sumlog.py`, `profiles/`, `prof.pstats`, `note.md` | Owner's experiments and notes (untracked). Ignore. |
 
-## Model interface (Equinox)
+## Models and parameters
 
-A model is an `eqx.Module` with one scalar `Array` field per parameter, plus `unit_pts` (a tuple of arrays for composite models). It also defines:
-
-- `@classmethod init(cls, *, params, dtype, spacing)`, which builds `unit_pts` **once, from the initial parameters**. The point count (`ceil(circumference/spacing)`, `ceil(area/spacing²)`) is fixed for the whole fit, so the loss value depends on the initial `r`/`c` and `spacing`.
-- `@classmethod default_params() -> dict` and `@classmethod trainable_names() -> tuple`. The tuple order must match `parameter_vector()`.
-- `__call__(self) -> (M, 3)` model points, `penalty(self) -> scalar`, `parameter_vector(self)`, and a `dtype` property.
-- A `register_model(...)` line in `models/__init__.py`. Canonical names should equal LocMoFit.jl's struct names.
-
-Freezing works by leaf **name**: `partition_with_freeze` marks a leaf trainable only if its attribute name is in `trainable_names()` and not in `freeze`, and `unit_pts` is never trainable.
+As in LocMoFit.jl (its `AGENTS.md`, Adding or changing a model): a model only describes a shape; its parameters live in a flat vector, mapped by `ParameterMap` to a dict `theta` of scalars. A simple model subclasses `SimpleModel` and defines `shape_parameters()` (names and defaults), `unit_points(shape, spacing=, dtype=)` (NumPy, built **once from the starting values**: the point count, `ceil(circumference/spacing)` or `ceil(area/spacing²)`, is fixed for the fit), `local_points(unit, shape)` (JAX, the (M, 3) points in its own frame), `shape_penalty` and `shape_summary`, and gets the pose and blur (`x, y, z, shape…, vx, vy, sigma`). The starting axis comes from `init_params` as `theta`, `phi` and centers the tangent chart; `theta`, `phi` are not parameters (freezing them raises), and the orientation is frozen through `vx`, `vy`. A `Composite` and the presets work as in LocMoFit.jl, with `tie={"r2": "r1"}` for equal parameters. Add a new model to `_MODELS` in `models.py` under LocMoFit.jl's name.
 
 **Mirror every model, default, penalty, or loss change in LocMoFit.jl** (see the parity section in `../AGENTS.md`), or say explicitly that you did not.
 
 ## Conventions
 
-- Style (root `AGENTS.md`, Style guide): PEP 8, formatted with `pixi run -e dev ruff format src tests` at 79 characters (`[tool.ruff] line-length = 79` in `pyproject.toml`; ruff skips the gitignored `_*profile.py`) and checked with `pixi run -e dev ruff check --select E,W,I --ignore E501,W505 src tests`. Comments and docstrings have one line per paragraph, list item or signature, with no hard line breaks, so they may exceed 79 characters; commented-out code keeps its lines. The math names `X`, `R`, `invSigma`, … and `ModelCls` are not renamed, so the naming rules (`N`) are not part of the check.
+- Style (root `AGENTS.md`, Style guide): PEP 8, formatted with `pixi run -e dev ruff format src tests` at 79 characters (`[tool.ruff] line-length = 79` in `pyproject.toml`; ruff skips the gitignored `_*profile.py`) and checked with `pixi run -e dev ruff check --select E,W,I --ignore E501,W505 src tests`. Comments and docstrings have one line per paragraph, list item or signature, with no hard line breaks, so they may exceed 79 characters; commented-out code keeps its lines. The math names (`X`, `R`, `D`, `M`, …) are not renamed for now (the owner's decision: after parity), so the naming rules (`N`) are not part of the check; `DoubleRing`, `SpCapRing` keep LocMoFit.jl's names.
 - **Data are `(N, D)` (rows are localizations)**, the transpose of LocMoFit.jl. Precisions are per-axis standard deviations of the same shape, in nm. For 2D input, the model points are truncated to their first 2 columns.
 - Parameter names are ASCII (`theta`, `phi`, `alpha`, `sigma`), as in LocMoFit.jl since 2026-10-28 (SciML style: no Unicode in public names).
-- `dtype="float64"` calls `jax.config.update("jax_enable_x64", True)`. That is **process-global and sticky**: it affects every later JAX call in the same Python process, including a long-lived MATLAB `pyenv` session.
-- Everything under `fit_lbfgs` is jitted. The loss must be pure and traceable: no Python branching on traced values, no `print` (use `jax.debug.print`).
-- The value `run_locmofit` returns must stay MATLAB-convertible: a `dict` of NumPy arrays and Python scalars (`losses`, `grad_norms`, `model_points`, `parameters`). Never return JAX arrays or Equinox modules.
+- `dtype` defaults to `"float64"` (since 2026-10-29, as in LocMoFit.jl; `"float32"` is an option). float64 calls `jax.config.update("jax_enable_x64", True)`, which is **process-global and sticky**: it affects every later JAX call in the same Python process, including a long-lived MATLAB `pyenv` session, so with the default every fit switches it on.
+- Everything under `bfgs` is jitted (`run_locmofit` jits it per call, so every call compiles). The loss must be pure and traceable: no Python branching on traced values, no `print` (use `jax.debug.print`).
+- The value `run_locmofit` returns must stay MATLAB-convertible: a `dict` of NumPy arrays, Python scalars, lists and dicts (`parameters`, `signal_fraction`, `weights`, `components`, `loss`, `model_points`, `iterations`, `retcode`, `history`). Never return JAX arrays.
 - Ask before adding dependencies (they go in `pyproject.toml`, and `pixi.lock` changes with them).
 
 ## Testing
 
-- The tests assert the final loss to `rtol=1e-6` against hard-coded numbers, and **both CPU tests currently fail**. The expected values (391.17, 96.36) predate the sum→mean change to the NLL and the later σ/penalty changes; current final losses are ~4.49 and ~2.20. Update an expected value only when the owner asks, and only after checking the new number against LocMoFit.jl on the same CSV with the same `init_params`, `spacing` and `dtype`.
-- Results are platform-sensitive. The CUDA 12 test is the same fit as the CPU spcap test, yet expects 93.598 instead of 96.357. Expect last-digit drift across JAX/XLA versions. Compare fitted parameters, not loss trajectories, when checking parity.
+- `test_models.py`, `test_loss.py` and `test_fit.py` port LocMoFit.jl's suite: the orientation chart against Rodrigues' formula; the model points against their geometry; composites, penalties, freezing and ties; the loss against an independent loop implementation of the posterior (every model, 3D and 2D, with and without background, three priors); float32 at 40 µm against the rounding bound; the change of length unit; JAX's gradient against central differences; `run_locmofit` (frozen values, history, no background, ties); and fits of the tutorial data from the moved start, within LocMoFit.jl's tolerances (from its accuracy benchmark).
+- **Parity:** each tutorial fit (float64) must equal LocMoFit.jl's (`tests/data/julia_fits.json`): the same iterations, the loss to 1e-10 and the parameters to 1e-6. Both use the same BFGS and line search, so they take the same path; on 2026-10-28 they agreed to 12 digits. Regenerate the reference with `julia --project=../LocMoFit.jl tests/data/julia_fits.jl` when LocMoFit.jl's fit changes.
+- In float32 the paths part: here the sums are pairwise (XLA), in LocMoFit.jl sequential, and LocMoFit.jl's float32 fits can stop early when the loss stops changing (2026-10-28).
+- Fixed inputs, no RNG (`common.pseudo`); x64 is enabled for the tests (`common.py`).

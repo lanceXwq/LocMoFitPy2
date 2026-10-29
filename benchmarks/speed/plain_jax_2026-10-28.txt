@@ -1,0 +1,14 @@
+# benchmarks/speed/speed.py on the port of 2026-10-28 (LocMoFit.jl's features; the likelihood as plain N×M JAX arrays, BFGS as in LocMoFit.jl, nothing optimized yet). Apple M1 Pro, CPU. 'call s' is a whole run_locmofit call, which compiles every time; 'fit s' is the jitted fit alone.
+
+jax 0.11.2 on cpu
+case         dtype        N      M  value ms   grad ms  v ns/NM  g ns/NM  call s   fit s  iter
+ring         float64    102    121     0.131     0.212    10.64    17.17    1.02  0.0116    43
+ring         float32    102    121     0.149     0.212    12.10    17.19   0.769   0.011    43
+ring2D       float64    102    121     0.137     0.184    11.08    14.93   0.517  0.0126    53
+ring2D       float32    102    121     0.123     0.167     9.93    13.57    0.55  0.0117    54
+double_ring  float64    187    242     0.231     0.644     5.10    14.22   0.808  0.0526    87
+double_ring  float32    187    242     0.244     0.522     5.40    11.54   0.867  0.0477    87
+spcap        float64    290   6648      2.49      22.8     1.29    11.81    1.66   0.913    50
+spcap        float32    290   6648      2.95      7.17     1.53     3.72     1.1   0.402    50
+spcap_ring   float64    330   1276     0.953      3.15     2.26     7.48    1.23   0.274    94
+spcap_ring   float32    330   1276     0.865      2.13     2.05     5.07    1.17   0.213    94

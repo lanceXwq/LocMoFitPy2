@@ -1,62 +1,86 @@
-import equinox as eqx
+"""The likelihood of LocMoFit.jl's derivations/derivation.qmd: each localization's density is a mixture of the structure (the mean of Gaussians over each component's model points, the components weighted) and a uniform background."""
+
+from __future__ import annotations
+
+import math
+
+import jax
 import jax.numpy as jnp
-from jax import Array
 from jax.scipy.special import logsumexp
 
-from .utils import Data
 
+def log_likelihood(
+    locs, loc_prec, points, ranges, sigma, logw, a, b, background
+):
+    """Σₙ log(eᵃ pₙ + eᵇ) over the localizations (the rows of the (N, D) `locs`, with precisions `loc_prec`), or Σₙ log pₙ without a background.
 
-def pairwise_sqdist(X: Array, Y: Array, invSigma: Array) -> Array:
+    pₙ is the structure's density at localization n: for each component k, whose model points are the rows `ranges[k]` of `points` (of which the first D columns are used), the mean of the Gaussians around its points with per-axis variances `loc_prec² + sigma²`; the components weighted by `exp(logw)`. In a fit, `a` is the log signal fraction and `b` the log of the background's density times its fraction. The squared distances are formed from differences (not expanded), so the result keeps its precision far from the origin, also in float32.
     """
-    Weighted pairwise squared distances.
-
-    Args:
-        X:        (N, 3) points
-        Y:        (M, 3) points
-        invSigma: (N, 3) per-X-point diagonal weights (precisions) for each dimension
-
-    Returns:
-        D2: (M, N) where
-            D2[m, n] = sum_d invSigma[n, d] * (Y[m, d] - X[n, d])**2
-    """
-    term1 = (Y * Y) @ invSigma.T
-    term2 = jnp.sum(invSigma * (X * X), axis=1)
-    term3 = Y @ (invSigma * X).T
-
-    return term1 + term2[None, :] - jnp.array(2.0, dtype=X.dtype) * term3
-
-
-def negative_log_likelihood(
-    x_data: Array, x_model: Array, half_tau: Array, log_const: Array
-) -> Array:
-    """
-    Args:
-        datapoints: (N, 3)
-        modelpoints: (M, 3)
-        half_tau: (N, 3)  per-datapoint diagonal weights (precisions/2), used in pairwise_sqdist
-        log_const: scalar or (N,) or (1,N), broadcastable to (M, N) as log_const - Δx²
-
-    Returns:
-        nll: scalar (0-dim) JAX array
-    """
-    sqdist = pairwise_sqdist(x_data, x_model, half_tau)
-    per_pair_lls = log_const - sqdist
-    lse = logsumexp(per_pair_lls, axis=0)
-    return -jnp.mean(lse)
+    D = locs.shape[1]
+    v = loc_prec**2 + sigma**2  # (N, D)
+    c = (
+        -jnp.sum(jnp.log(2 * math.pi * v), axis=1) / 2
+    )  # the Gaussians' normalization
+    d = locs[:, None, :] - points[None, :, :D]  # (N, M, D)
+    q = jnp.sum(d**2 / (2 * v[:, None, :]), axis=2)  # (N, M)
+    terms = [
+        logw[k]
+        - math.log(r.stop - r.start)
+        + logsumexp(-q[:, r.start : r.stop], axis=1)
+        for k, r in enumerate(ranges)
+    ]
+    S = terms[0] if len(terms) == 1 else logsumexp(jnp.stack(terms), axis=0)
+    if not background:
+        return jnp.sum(c + S)
+    return jnp.sum(jnp.logaddexp(a + c + S, b))
 
 
-def make_loss(static, data: Data):
-    def nll_loss(trainable):
-        model = eqx.combine(trainable, static)
-        positions = model()
-        half_precs, log_consts = data.norm_const(model.sigma)
-        if data.locs.shape[1] < positions.shape[1]:
-            positions = positions[:, : data.locs.shape[1]]
-        return (
-            negative_log_likelihood(
-                data.locs, positions, half_precs, log_consts
+def make_loss(problem):
+    """The objective of a fit, as a function of the free parameters `u`: minus the log posterior of the parameters, per localization, plus the model's penalty (`problem` from `fit_problem`)."""
+    model, pmap, unit = (
+        problem.model,
+        problem.parameter_map,
+        problem.unit_model,
+    )
+    locs, prec = problem.locs, problem.loc_prec
+    N = locs.shape[0]
+
+    def loss(u):
+        theta = pmap.full_parameters(u)
+        points = model.model_points(unit, theta)
+        lw = jnp.stack(model.log_weights(theta))
+        logw = lw - logsumexp(lw)
+        if not problem.background:
+            ll = log_likelihood(
+                locs,
+                prec,
+                points,
+                problem.ranges,
+                theta["sigma"],
+                logw,
+                0.0,
+                0.0,
+                False,
             )
-            + model.penalty()
+            return -ll / N + model.penalty(theta)
+        lam = theta["logit_prob"]
+        log_pi, log_1mpi = jax.nn.log_sigmoid(lam), jax.nn.log_sigmoid(-lam)
+        ll = log_likelihood(
+            locs,
+            prec,
+            points,
+            problem.ranges,
+            theta["sigma"],
+            logw,
+            log_pi,
+            log_1mpi - problem.log_volume,
+            True,
         )
+        if problem.signal_prior is None:
+            prior = jnp.zeros_like(log_pi)
+        else:
+            a, b = problem.signal_prior
+            prior = (a - 1) * log_pi + (b - 1) * log_1mpi
+        return -(ll + prior) / N + model.penalty(theta)
 
-    return nll_loss
+    return loss

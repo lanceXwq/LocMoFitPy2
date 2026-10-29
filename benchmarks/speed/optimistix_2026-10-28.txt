@@ -1,0 +1,57 @@
+# optimistix 0.1.0 (BFGS with its BacktrackingArmijo line search and Cauchy termination at rtol = atol = tol) against the own BFGS loop (bfgs.py, as Optim.jl's), on the tutorial sites from the moved start, 2026-10-28. jax 0.11.2, CPU (Apple M1 Pro), warm jitted fits (best of 3). 'loss - ours' is the final loss minus the own loop's (per localization), 'max|g|' the final largest gradient component, 'max|du|' the largest difference of the fitted free parameters from the own loop's. The comparison ran in a scratch environment; optimistix is not a dependency.
+
+case         dtype    solver             time s  steps  loss - ours    max|g|   max|du|
+ring         float64  own BFGS           0.0103     43            0   2.4e-05         0
+ring         float64  optx tol 1e-06     0.0083     50       -4e-08   3.8e-10    0.0023
+ring         float64  optx tol 1e-08     0.0088     54       -4e-08   3.4e-10    0.0023
+ring         float32  own BFGS           0.0105     43            0   2.4e-05         0
+ring         float32  optx tol 1e-06     0.0081     68        2e-05   0.00043     0.087
+ring         float32  optx tol 1e-08     0.0082     68        2e-05   0.00043     0.087
+ring2D       float64  own BFGS           0.0114     53            0   5.4e-05         0
+ring2D       float64  optx tol 1e-06     0.0082     53    -1.46e-08   2.7e-08    0.0012
+ring2D       float64  optx tol 1e-08     0.0134    109    -1.46e-08   5.1e-11    0.0012
+ring2D       float32  own BFGS           0.0116     54            0   2.5e-06         0
+ring2D       float32  optx tol 1e-06     0.0090     81            0     2e-05   0.00096
+ring2D       float32  optx tol 1e-08     0.0090     81            0     2e-05   0.00096
+double_ring  float64  own BFGS           0.0554     87            0   3.5e-05         0
+double_ring  float64  optx tol 1e-06     0.0426    104    -3.12e-08   1.5e-08    0.0042
+double_ring  float64  optx tol 1e-08     0.0524    159    -3.12e-08   1.5e-08    0.0042
+double_ring  float32  own BFGS           0.0473     87            0   3.7e-05         0
+double_ring  float32  optx tol 1e-06     0.0354    114    -9.54e-07   5.9e-05    0.0027
+double_ring  float32  optx tol 1e-08     0.0347    114    -9.54e-07   5.9e-05    0.0027
+spcap        float64  own BFGS           0.7509     50            0     2e-05         0
+spcap        float64  optx tol 1e-06     0.8950     92    -2.63e-08   4.7e-08    0.0074
+spcap        float64  optx tol 1e-08     0.8963     92    -2.63e-08   4.7e-08    0.0074
+spcap        float32  own BFGS           0.3997     50            0   1.9e-05         0
+spcap        float32  optx tol 1e-06     0.2705     70     0.000141   0.00045      0.51
+spcap        float32  optx tol 1e-08     0.2668     70     0.000141   0.00045      0.51
+spcap_ring   float64  own BFGS           0.2670     94            0   6.3e-05         0
+spcap_ring   float64  optx tol 1e-06     0.2678    122    -2.44e-05   1.5e-08      0.53
+spcap_ring   float64  optx tol 1e-08     0.3116    159    -2.44e-05   7.1e-09      0.53
+spcap_ring   float32  own BFGS           0.2115     94            0   6.4e-05         0
+spcap_ring   float32  optx tol 1e-06     0.1527    110     0.000168   0.00021      0.92
+spcap_ring   float32  optx tol 1e-08     0.1521    110     0.000168   0.00021      0.92
+
+# Rerun the same day with optimistix stopping on the gradient like the own loop (a subclass of optx.BFGS whose terminate checks max|grad| <= 1e-4, rtol = atol = 0; optimistix 0.1.0 has no gradient tolerance built in, only Cauchy termination on the parameters and the loss):
+
+case         dtype    solver           time s  steps  loss - ours    max|g|   max|du|
+ring         float64  own BFGS         0.0104     43            0   2.4e-05         0
+ring         float64  optx, gradient   0.0068     46     2.28e-08   6.3e-05   0.00047
+ring         float32  own BFGS         0.0106     43            0   2.4e-05         0
+ring         float32  optx, gradient   0.0155    200        2e-05   0.00043     0.087  (optimistix._solution.RESULTS<The maximum number of steps was reached in the nonlinear solver. The problem may not be solveable (e.g., a root-find on a function that has no roots), or you may need to increase `max_steps`.>)
+ring2D       float64  own BFGS         0.0117     53            0   5.4e-05         0
+ring2D       float64  optx, gradient   0.0077     50    -8.52e-10   2.1e-05   0.00034
+ring2D       float32  own BFGS         0.0116     54            0   2.5e-06         0
+ring2D       float32  optx, gradient   0.0073     50            0   2.1e-05     0.001
+double_ring  float64  own BFGS         0.0534     87            0   3.5e-05         0
+double_ring  float64  optx, gradient   0.0362     87     5.36e-08   6.1e-05    0.0029
+double_ring  float32  own BFGS         0.0505     87            0   3.7e-05         0
+double_ring  float32  optx, gradient   0.0329     87    -9.54e-07   5.9e-05    0.0027
+spcap        float64  own BFGS         0.7571     50            0     2e-05         0
+spcap        float64  optx, gradient   0.6545     60    -1.55e-09   6.9e-05   0.00065
+spcap        float32  own BFGS         0.3940     50            0   1.9e-05         0
+spcap        float32  optx, gradient   0.5692    200     0.000141   0.00045      0.51  (optimistix._solution.RESULTS<The maximum number of steps was reached in the nonlinear solver. The problem may not be solveable (e.g., a root-find on a function that has no roots), or you may need to increase `max_steps`.>)
+spcap_ring   float64  own BFGS         0.3153     94            0   6.3e-05         0
+spcap_ring   float64  optx, gradient   0.2161    100     7.33e-08   6.3e-05     0.015
+spcap_ring   float32  own BFGS         0.2127     94            0   6.4e-05         0
+spcap_ring   float32  optx, gradient   0.2788    200     0.000168   0.00021      0.92  (optimistix._solution.RESULTS<The maximum number of steps was reached in the nonlinear solver. The problem may not be solveable (e.g., a root-find on a function that has no roots), or you may need to increase `max_steps`.>)
