@@ -29,34 +29,36 @@ class BFGSResult(NamedTuple):
     history_x: jax.Array
 
 
-def _linesearch(fun, x, s, f0, dphi0):
-    """LineSearches.jl's BackTracking (order 3) from a step of 1. Returns the step and whether the search succeeded."""
+def _linesearch(value_and_grad, x, s, f0, dphi0):
+    """LineSearches.jl's BackTracking (order 3) from a step of 1. Returns the step, whether the search succeeded, and the value and gradient there. Every trial point gets its gradient along with its value: the search nearly always accepts its first point, which then needs no second evaluation (NOTES.md)."""
     dtype = x.dtype
-    phi = lambda a: fun(x + a * s)  # noqa: E731
+    phi = lambda a: value_and_grad(x + a * s)  # noqa: E731
     ok = jnp.isfinite(f0) & jnp.isfinite(dphi0) & (dphi0 <= 0)
     one = jnp.ones((), dtype)
     iterfinitemax = -math.log2(float(jnp.finfo(dtype).eps))
 
     # halve the step until the value is finite
     def finite_cond(c):
-        a, fa, it = c
+        a, (fa, _), it = c
         return ~jnp.isfinite(fa) & (it < iterfinitemax)
 
     def finite_body(c):
-        a, fa, it = c
+        a, _, it = c
         a = a / 2
         return a, phi(a), it + 1
 
-    a2, f1, _ = lax.while_loop(finite_cond, finite_body, (one, phi(one), 0))
+    a2, (f1, g1), _ = lax.while_loop(
+        finite_cond, finite_body, (one, phi(one), 0)
+    )
     ok = ok & jnp.isfinite(f1)
 
     # backtrack until the sufficient decrease (Armijo) condition holds
     def cond(c):
-        a1, a2, fx0, fx1, it, failed = c
+        a1, a2, fx0, fx1, g1, it, failed = c
         return (fx1 > f0 + C1 * a2 * dphi0) & ~failed & ok
 
     def body(c):
-        a1, a2, fx0, fx1, it, failed = c
+        a1, a2, fx0, fx1, g1, it, failed = c
         it = it + 1
         quadratic = -(dphi0 * a2**2) / (2 * (fx1 - f0 - dphi0 * a2))
         div = 1 / (a1**2 * a2**2 * (a2 - a1))
@@ -77,26 +79,27 @@ def _linesearch(fun, x, s, f0, dphi0):
             a_tmp, a2 * RHO_HI
         )  # avoid too small reductions (NaN-ignoring, as NaNMath)
         a_new = jnp.fmax(a_tmp, a2 * RHO_LO)  # avoid too big reductions
-        f_new = phi(a_new)
 
         # halve the step while the value is not finite
         def nf_cond(cc):
-            a, fa, i = cc
+            a, (fa, _), i = cc
             return ~jnp.isfinite(fa) & (i < LS_ITERATIONS)
 
         def nf_body(cc):
-            a, fa, i = cc
+            a, _, i = cc
             a = a / 2
             return a, phi(a), i + 1
 
-        a_new, f_new, it = lax.while_loop(nf_cond, nf_body, (a_new, f_new, it))
+        a_new, (f_new, g_new), it = lax.while_loop(
+            nf_cond, nf_body, (a_new, phi(a_new), it)
+        )
         failed = failed | (it > LS_ITERATIONS) | ~jnp.isfinite(f_new)
-        return a1, a_new, fx1, f_new, it, failed
+        return a1, a_new, fx1, f_new, g_new, it, failed
 
-    _, a2, _, _, _, failed = lax.while_loop(
-        cond, body, (one, a2, f0, f1, 0, jnp.array(False))
+    _, a2, _, f2, g2, _, failed = lax.while_loop(
+        cond, body, (one, a2, f0, f1, g1, 0, jnp.array(False))
     )
-    return a2, ok & ~failed & (a2 > 0)
+    return a2, ok & ~failed & (a2 > 0), f2, g2
 
 
 def bfgs(
@@ -126,19 +129,18 @@ def bfgs(
         reset = g @ s >= 0
         H = jnp.where(reset, eye, H)
         s = jnp.where(reset, -g, s)
-        alpha, ok = _linesearch(fun, x, s, f, g @ s)
+        alpha, ok, f_new, g_new = _linesearch(value_and_grad, x, s, f, g @ s)
 
         # on failure, reset the inverse Hessian and try once more
         def retry(_):
             s2 = -g
-            a2, ok2 = _linesearch(fun, x, s2, f, g @ s2)
-            return eye, s2, a2, ok2
+            a2, ok2, f2, g2 = _linesearch(value_and_grad, x, s2, f, g @ s2)
+            return eye, s2, a2, ok2, f2, g2
 
-        H, s, alpha, ok = lax.cond(
-            ok, lambda _: (H, s, alpha, ok), retry, None
+        H, s, alpha, ok, f_new, g_new = lax.cond(
+            ok, lambda _: (H, s, alpha, ok, f_new, g_new), retry, None
         )
         x_new = x + alpha * s
-        f_new, g_new = value_and_grad(x_new)
         accept = ok & jnp.isfinite(f_new) & jnp.all(jnp.isfinite(g_new))
 
         dx = x_new - x

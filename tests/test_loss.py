@@ -174,3 +174,17 @@ def test_gradient(case, kwargs, D):
         )
     assert np.allclose(g, fd, rtol=1e-5, atol=1e-8 * np.max(np.abs(fd)))
     assert full(p, u)  # every parameter is a finite number
+
+
+@pytest.mark.parametrize("case", range(len(CASES)))
+@pytest.mark.parametrize("D", [3, 2])
+def test_padding(case, D):
+    # run_locmofit pads the localizations and each component's points to bucket sizes and masks the padding, so that sites of similar sizes share one compilation: the padded loss and its gradient equal the exact ones
+    _, model, theta, starts = CASES[case]
+    locs, precs = make_data(model, theta, starts, D=D, every=3)
+    p, u = problem(model, theta, starts, locs, precs)
+    exact, padded = lm.make_loss(p), lm.make_loss(p, pad=True)
+    data, static = lm.loss.fit_data(p, pad=True)
+    assert len(data.locs) > len(locs) or any(e - s > r.stop - r.start for (s, e), r in zip(static.blocks, p.ranges))
+    assert float(padded(u)) == pytest.approx(float(exact(u)), rel=1e-12)
+    assert np.allclose(jax.grad(padded)(u), jax.grad(exact)(u), rtol=1e-10, atol=1e-14)

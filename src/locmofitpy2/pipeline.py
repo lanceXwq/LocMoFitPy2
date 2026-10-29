@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ import numpy as np
 from jax.typing import ArrayLike
 
 from .bfgs import bfgs
-from .loss import make_loss
+from .loss import FitStatic, fit_data, loss_value
 from .models import get_model
 from .parameters import ParameterMap, apply_init, freeze_names, tie_pairs
 
@@ -141,7 +142,7 @@ def run_locmofit(
     - `tie`: `{target: source}` (or pairs), such as `{"r2": "r1"}`: the target takes the source's value throughout.
     - `max_iter`, `tol`: the fit stops when no component of the loss's gradient exceeds `tol` (default 1e-4, reachable in float32), or after `max_iter` iterations.
     - `spacing`: the distance between model points, in nm. The points are generated once, from the starting values.
-    - `dtype`: `"float64"` (default, since 2026-10-29) or `"float32"`. float64 sets `jax_enable_x64`, which is process-global and stays on for the rest of the process (a MATLAB `pyenv` session too). float32 is faster on large models (a cap fit about 2×) and should reach `tol` here, but check it against float64 on your data.
+    - `dtype`: `"float64"` (default, since 2026-10-29) or `"float32"`. float64 sets `jax_enable_x64`, which is process-global and stays on for the rest of the process (a MATLAB `pyenv` session too). float32 is faster on large models (a cap fit about 1.7×) but can stop early, before the gradient reaches `tol`, with the loss up to about 1e-4 per localization above the optimum (a known issue: NOTES.md).
     - `background`: whether some localizations are background, uniform over the field of view; their share is 1 − logistic(`logit_prob`), fitted from 0.1.
     - `fov_volume`: the volume (area, in 2D) of the field of view, in nm³ (nm²); default the localizations' bounding box, a little smaller.
     - `signal_prior`: `(a, b)` of the Beta prior on the signal fraction, or None. The default, (5, 2), has its mode at 0.8 and weighs as much as 5 localizations.
@@ -162,14 +163,35 @@ def run_locmofit(
         fov_volume=fov_volume,
         signal_prior=signal_prior,
     )
-    loss = make_loss(problem)
-    result = jax.jit(
-        lambda u: bfgs(loss, u, max_iter=max_iter, tol=tol, history=history)
-    )(u0)
-    return fit_result(problem, result, history)
+    data, static = fit_data(problem, pad=True)
+    result, points = compiled_fit(static, max_iter, float(tol), history)(
+        u0, data
+    )
+    return fit_result(problem, static, result, points, history)
 
 
-def fit_result(problem: Problem, result, history: bool) -> dict[str, Any]:
+@functools.lru_cache(maxsize=None)
+def compiled_fit(static: FitStatic, max_iter: int, tol: float, history: bool):
+    """The jitted fit for one model structure and array layout: `(u0, data) -> (BFGSResult, model points)`. Sites whose padded sizes agree (`loss.bucket`) reuse it, so a dataset compiles once per model and size class, not once per site."""
+
+    def fit(u0, data):
+        result = bfgs(
+            lambda u: loss_value(u, data, static),
+            u0,
+            max_iter=max_iter,
+            tol=tol,
+            history=history,
+        )
+        theta_vec = data.base + data.S @ result.x
+        theta = {k: theta_vec[i] for i, k in enumerate(static.names)}
+        return result, static.model.model_points(data.unit_model, theta)
+
+    return jax.jit(fit)
+
+
+def fit_result(
+    problem: Problem, static: FitStatic, result, points, history: bool
+) -> dict[str, Any]:
     model, pmap = problem.model, problem.parameter_map
 
     def full(u) -> dict[str, float]:
@@ -178,19 +200,14 @@ def fit_result(problem: Problem, result, history: bool) -> dict[str, Any]:
                 pmap.names,
                 (
                     float(v)
-                    for v in np.asarray(pmap.full_vector(jnp.asarray(u)))
+                    for v in pmap.base + pmap.S @ np.asarray(u, dtype=float)
                 ),
             )
         )
 
     theta = full(result.x)
     lw = np.array(
-        [
-            float(w)
-            for w in model.log_weights(
-                {k: jnp.asarray(v) for k, v in theta.items()}
-            )
-        ]
+        [0.0] + [theta[f"omega{k}"] for k in range(2, model.ncomponents() + 1)]
     )
     weights = np.exp(lw - lw.max())
     iterations = int(result.iterations)
@@ -212,6 +229,11 @@ def fit_result(problem: Problem, result, history: bool) -> dict[str, Any]:
                 k: np.array([t[k] for t in thetas]) for k in pmap.names
             },
         }
+    points = np.asarray(points)
+    real = [
+        points[s : s + (len(unit[0]))]
+        for (s, _), unit in zip(static.blocks, problem.unit_model)
+    ]
     return {
         "parameters": theta,
         "signal_fraction": 1 / (1 + math.exp(-theta["logit_prob"]))
@@ -220,12 +242,7 @@ def fit_result(problem: Problem, result, history: bool) -> dict[str, Any]:
         "weights": weights / weights.sum(),
         "components": model.summary(problem.unit_model, theta),
         "loss": float(result.f),
-        "model_points": np.asarray(
-            model.model_points(
-                problem.unit_model,
-                {k: jnp.asarray(v, problem.dtype) for k, v in theta.items()},
-            )
-        ),
+        "model_points": np.concatenate(real),
         "iterations": iterations,
         "retcode": retcode,
         "history": hist,
